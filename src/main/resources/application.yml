@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: spring-agent
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/spring_agent}
+    username: ${DB_USERNAME:spring_agent}
+    password: ${DB_PASSWORD:spring_agent_dev}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+  ai:
+    deepseek:
+      api-key: ${DEEPSEEK_API_KEY}
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true

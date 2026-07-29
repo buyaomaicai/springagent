@@ -1,0 +1,48 @@
+schema_version: 1
+retrieved_on: 2026-07-29
+
+git_sources:
+  - id: spring-boot-wiki
+    repository: https://github.com/spring-projects/spring-boot.wiki.git
+    documents:
+      - path: releasenotes/Spring-Boot-3.0-Migration-Guide.asciidoc
+        commit: eeac9539123659067e2918b9c225fb7798a46857
+      - path: releasenotes/Spring-Boot-3.0-Release-Notes.asciidoc
+        commit: 4076866bdcbbe55ca328361cfb158f1c0aafe35c
+      - path: releasenotes/Spring-Boot-3.1-Release-Notes.asciidoc
+        commit: c57451d820d229e1313da1b3f70a3f283b68c4d7
+      - path: releasenotes/Spring-Boot-3.2-Release-Notes.asciidoc
+        commit: b268e20b0887126a98936822ce6208a085a5dd1e
+      - path: releasenotes/Spring-Boot-3.3-Release-Notes.asciidoc
+        commit: b677938c7f72eafe86ae3620b8662d796509d654
+      - path: releasenotes/Spring-Boot-3.4-Release-Notes.asciidoc
+        commit: 914b118934e73d0c2d6ed21c0a7c02417f502403
+      - path: releasenotes/Spring-Boot-3.5-Release-Notes.asciidoc
+        commit: 7ba79e6015545ec4e835daa93c07164e6e9e19cb
+      - path: releasenotes/Spring-Boot-4.0-Migration-Guide.asciidoc
+        commit: e11f389f3671d1eb7fa346065410b5b1eab99c3c
+      - path: releasenotes/Spring-Boot-4.0-Release-Notes.asciidoc
+        commit: 6d60f0ae8bd46586e59b2a44173578f5973c3d51
+      - path: releasenotes/Spring-Boot-4.0-Configuration-Changelog.asciidoc
+        commit: c721305befddcaf6d55c1df39088754f8b3428b8
+
+  - id: spring-framework-wiki
+    repository: https://github.com/spring-projects/spring-framework.wiki.git
+    commit: b7c00046638cbe9196619a587d7c450248dccfb0
+    documents:
+      - Spring-Framework-6.0-Release-Notes.md
+      - Spring-Framework-6.1-Release-Notes.md
+      - Spring-Framework-6.2-Release-Notes.md
+      - Spring-Framework-7.0-Release-Notes.md
+      - Upgrading-to-Spring-Framework-6.x.md
+      - Upgrading-to-JDK-17.md
+
+web_sources:
+  - id: spring-security-6.5-migration
+    root_url: https://docs.spring.io/spring-security/reference/6.5/migration/
+  - id: jdk-11-migration
+    root_url: https://docs.oracle.com/en/java/javase/11/migrate/
+  - id: jdk-17-migration
+    root_url: https://docs.oracle.com/en/java/javase/17/migrate/
+  - id: jdk-21-migration
+    root_url: https://docs.oracle.com/en/java/javase/21/migrate/
