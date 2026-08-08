@@ -1,9 +1,9 @@
 package com.springagent.diagnosis.service.impl;
 
-import com.springagent.entity.DiagnosisRisk;
-import com.springagent.mapper.DiagnosisRiskMapper;
+import com.springagent.diagnosis.entity.DiagnosisRisk;
+import com.springagent.diagnosis.mapper.DiagnosisRiskMapper;
 import com.springagent.diagnosis.service.IDiagnosisRiskService;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
 
 /**

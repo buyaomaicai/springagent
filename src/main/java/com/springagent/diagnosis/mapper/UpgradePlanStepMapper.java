@@ -1,6 +1,6 @@
 package com.springagent.diagnosis.mapper;
 
-import com.springagent.entity.UpgradePlanStep;
+import com.springagent.diagnosis.entity.UpgradePlanStep;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 
 /**

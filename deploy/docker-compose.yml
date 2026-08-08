@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:17-alpine
+    image: ${POSTGRES_IMAGE:-pgvector/pgvector:pg17}
     container_name: spring-agent-postgres
     restart: unless-stopped
     environment:
@@ -21,6 +21,26 @@ services:
       retries: 20
       start_period: 10s
 
+  ollama:
+    image: ${OLLAMA_IMAGE:-ollama/ollama:latest}
+    container_name: spring-agent-ollama
+    restart: unless-stopped
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-5m}
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
 volumes:
   postgres-data:
     name: spring-agent-postgres-data
+  ollama-data:
+    name: spring-agent-ollama-data

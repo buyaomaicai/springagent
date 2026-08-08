@@ -1,9 +1,9 @@
 package com.springagent.diagnosis.service.impl;
 
-import com.springagent.entity.ModificationSuggestion;
-import com.springagent.mapper.ModificationSuggestionMapper;
+import com.springagent.diagnosis.entity.ModificationSuggestion;
+import com.springagent.diagnosis.mapper.ModificationSuggestionMapper;
 import com.springagent.diagnosis.service.IModificationSuggestionService;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
 
 /**

@@ -1,6 +1,6 @@
 package com.springagent.diagnosis.mapper;
 
-import com.springagent.entity.DiagnosisRisk;
+import com.springagent.diagnosis.entity.DiagnosisRisk;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 
 /**

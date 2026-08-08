@@ -1,9 +1,9 @@
 package com.springagent.diagnosis.service.impl;
 
-import com.springagent.entity.AppUser;
-import com.springagent.mapper.AppUserMapper;
+import com.springagent.diagnosis.entity.AppUser;
+import com.springagent.diagnosis.mapper.AppUserMapper;
 import com.springagent.diagnosis.service.IAppUserService;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
 
 /**

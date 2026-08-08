@@ -1,6 +1,6 @@
 package com.springagent.diagnosis.mapper;
 
-import com.springagent.entity.AppUser;
+import com.springagent.diagnosis.entity.AppUser;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 
 /**

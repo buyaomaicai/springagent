@@ -13,8 +13,21 @@ spring:
   ai:
     deepseek:
       api-key: ${DEEPSEEK_API_KEY}
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      embedding:
+        options:
+          model: bge-m3
+
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        dimensions: 1024
+        distance-type: COSINE_DISTANCE
+        index-type: HNSW
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
+  type-handlers-package: com.springagent.common.persistence
   configuration:
     map-underscore-to-camel-case: true

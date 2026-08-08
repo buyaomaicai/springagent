@@ -1,8 +1,11 @@
 package com.springagent.diagnosis.service;
 
 import com.baomidou.mybatisplus.spring.service.IService;
+import com.springagent.admin.domain.vo.ConversationListVO;
+import com.springagent.admin.domain.vo.ConversationVO;
 import com.springagent.diagnosis.entity.ChatConversation;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -16,4 +19,8 @@ import java.util.UUID;
 public interface IChatConversationService extends IService<ChatConversation> {
 
     ChatConversation getOrCreateConversation(UUID conversationId);
+
+    List<ConversationListVO> getConversionList();
+
+    List<ConversationVO> getConversionByUserId(UUID id);
 }

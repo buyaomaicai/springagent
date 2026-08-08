@@ -1,9 +1,9 @@
 package com.springagent.diagnosis.service.impl;
 
-import com.springagent.entity.KnowledgeEvidence;
-import com.springagent.mapper.KnowledgeEvidenceMapper;
+import com.springagent.diagnosis.entity.KnowledgeEvidence;
+import com.springagent.diagnosis.mapper.KnowledgeEvidenceMapper;
 import com.springagent.diagnosis.service.IKnowledgeEvidenceService;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
 
 /**

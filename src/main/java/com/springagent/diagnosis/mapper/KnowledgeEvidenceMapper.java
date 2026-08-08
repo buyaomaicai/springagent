@@ -1,6 +1,6 @@
 package com.springagent.diagnosis.mapper;
 
-import com.springagent.entity.KnowledgeEvidence;
+import com.springagent.diagnosis.entity.KnowledgeEvidence;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 
 /**

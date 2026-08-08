@@ -1,9 +1,9 @@
 package com.springagent.diagnosis.service.impl;
 
-import com.springagent.entity.ChatAttachment;
-import com.springagent.mapper.ChatAttachmentMapper;
+import com.springagent.diagnosis.entity.ChatAttachment;
+import com.springagent.diagnosis.mapper.ChatAttachmentMapper;
 import com.springagent.diagnosis.service.IChatAttachmentService;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
 
 /**

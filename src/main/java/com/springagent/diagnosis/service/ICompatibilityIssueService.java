@@ -1,7 +1,7 @@
 package com.springagent.diagnosis.service;
 
-import com.springagent.entity.CompatibilityIssue;
-import com.baomidou.mybatisplus.extension.service.IService;
+import com.springagent.diagnosis.entity.CompatibilityIssue;
+import com.baomidou.mybatisplus.spring.service.IService;
 
 /**
  * <p>

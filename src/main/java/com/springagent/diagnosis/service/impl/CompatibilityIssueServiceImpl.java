@@ -1,9 +1,9 @@
 package com.springagent.diagnosis.service.impl;
 
-import com.springagent.entity.CompatibilityIssue;
-import com.springagent.mapper.CompatibilityIssueMapper;
+import com.springagent.diagnosis.entity.CompatibilityIssue;
+import com.springagent.diagnosis.mapper.CompatibilityIssueMapper;
 import com.springagent.diagnosis.service.ICompatibilityIssueService;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
 
 /**

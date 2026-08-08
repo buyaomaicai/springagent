@@ -1,9 +1,9 @@
 package com.springagent.diagnosis.service.impl;
 
-import com.springagent.entity.UpgradePlanStep;
-import com.springagent.mapper.UpgradePlanStepMapper;
+import com.springagent.diagnosis.entity.UpgradePlanStep;
+import com.springagent.diagnosis.mapper.UpgradePlanStepMapper;
 import com.springagent.diagnosis.service.IUpgradePlanStepService;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
 
 /**

@@ -1,6 +1,6 @@
 package com.springagent.diagnosis.mapper;
 
-import com.springagent.entity.ChatAttachment;
+import com.springagent.diagnosis.entity.ChatAttachment;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 
 /**

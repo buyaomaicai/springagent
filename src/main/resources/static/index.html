@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Spring Agent Test Console</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f4f6f8;
+            --surface: #ffffff;
+            --line: #d9dee5;
+            --text: #17202a;
+            --muted: #66717f;
+            --accent: #16794b;
+            --accent-hover: #10643d;
+            --user: #e8f1fb;
+            --assistant: #ffffff;
+            --danger: #b42318;
+            --warning: #9a6700;
+            --shadow: 0 8px 24px rgba(23, 32, 42, 0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+            font-size: 14px;
+            letter-spacing: 0;
+        }
+
+        button,
+        input,
+        textarea {
+            font: inherit;
+            letter-spacing: 0;
+        }
+
+        button,
+        input,
+        textarea {
+            border-radius: 6px;
+        }
+
+        button:focus-visible,
+        input:focus-visible,
+        textarea:focus-visible {
+            outline: 3px solid rgba(22, 121, 75, 0.18);
+            outline-offset: 1px;
+        }
+
+        .app {
+            display: grid;
+            grid-template-rows: auto auto minmax(0, 1fr) auto;
+            min-height: 100%;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 58px;
+            padding: 0 24px;
+            border-bottom: 1px solid #26313b;
+            background: #17202a;
+            color: #fff;
+        }
+
+        .brand {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .brand strong {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .brand span {
+            color: #b9c2cc;
+            font-size: 12px;
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+            color: #dce3e9;
+            font-size: 12px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #8c98a4;
+        }
+
+        .status[data-state="online"] .status-dot {
+            background: #43c17b;
+        }
+
+        .status[data-state="busy"] .status-dot {
+            background: #f0b429;
+        }
+
+        .status[data-state="offline"] .status-dot {
+            background: #f97066;
+        }
+
+        .settings {
+            display: grid;
+            grid-template-columns: minmax(220px, 1fr) minmax(280px, 1.4fr) auto;
+            gap: 12px;
+            padding: 14px 24px;
+            border-bottom: 1px solid var(--line);
+            background: var(--surface);
+        }
+
+        .field {
+            display: grid;
+            gap: 5px;
+            min-width: 0;
+        }
+
+        .field label {
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .field input {
+            width: 100%;
+            height: 36px;
+            border: 1px solid var(--line);
+            background: #fff;
+            color: var(--text);
+            padding: 0 10px;
+        }
+
+        .secondary {
+            align-self: end;
+            height: 36px;
+            border: 1px solid var(--line);
+            background: #fff;
+            color: #34404c;
+            padding: 0 14px;
+            cursor: pointer;
+        }
+
+        .secondary:hover {
+            background: #f5f7f9;
+        }
+
+        .conversation {
+            min-height: 0;
+            overflow-y: auto;
+            padding: 28px 24px;
+        }
+
+        .messages {
+            width: min(860px, 100%);
+            margin: 0 auto;
+            display: grid;
+            gap: 16px;
+        }
+
+        .empty {
+            display: grid;
+            place-items: center;
+            min-height: 40vh;
+            color: var(--muted);
+            text-align: center;
+        }
+
+        .message {
+            display: grid;
+            gap: 6px;
+            width: min(760px, 92%);
+        }
+
+        .message.user {
+            justify-self: end;
+        }
+
+        .message.assistant {
+            justify-self: start;
+        }
+
+        .message-meta {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .message.user .message-meta {
+            text-align: right;
+        }
+
+        .message-body {
+            min-height: 42px;
+            padding: 12px 14px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: var(--assistant);
+            box-shadow: var(--shadow);
+            line-height: 1.65;
+            overflow-wrap: anywhere;
+            white-space: pre-wrap;
+        }
+
+        .message.user .message-body {
+            border-color: #c9daed;
+            background: var(--user);
+            box-shadow: none;
+        }
+
+        .message.error .message-body {
+            border-color: #f3b7b1;
+            color: var(--danger);
+            background: #fff7f6;
+        }
+
+        .composer-band {
+            border-top: 1px solid var(--line);
+            background: var(--surface);
+            padding: 16px 24px 20px;
+        }
+
+        .composer {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 96px;
+            gap: 10px;
+            width: min(860px, 100%);
+            margin: 0 auto;
+        }
+
+        .composer textarea {
+            width: 100%;
+            min-height: 74px;
+            max-height: 180px;
+            resize: vertical;
+            border: 1px solid #bfc7d1;
+            background: #fff;
+            color: var(--text);
+            padding: 12px;
+            line-height: 1.5;
+        }
+
+        .primary {
+            min-height: 44px;
+            border: 0;
+            background: var(--accent);
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .primary[data-mode="stop"] {
+            background: var(--danger);
+        }
+
+        .primary:disabled {
+            cursor: not-allowed;
+            opacity: 0.55;
+        }
+
+        .request-state {
+            min-height: 20px;
+            width: min(860px, 100%);
+            margin: 8px auto 0;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .request-state.error {
+            color: var(--danger);
+        }
+
+        @media (max-width: 720px) {
+            .topbar,
+            .settings,
+            .conversation,
+            .composer-band {
+                padding-left: 14px;
+                padding-right: 14px;
+            }
+
+            .brand span {
+                display: none;
+            }
+
+            .settings {
+                grid-template-columns: 1fr;
+            }
+
+            .secondary {
+                width: 100%;
+            }
+
+            .conversation {
+                padding-top: 18px;
+                padding-bottom: 18px;
+            }
+
+            .message {
+                width: 96%;
+            }
+
+            .composer {
+                grid-template-columns: 1fr;
+            }
+
+            .primary {
+                height: 44px;
+            }
+        }
+    </style>
+</head>
+<body>
+<main class="app">
+    <header class="topbar">
+        <div class="brand">
+            <strong>Spring Agent</strong>
+            <span>Diagnosis test console</span>
+        </div>
+        <div id="apiStatus" class="status" data-state="busy" aria-live="polite">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span id="apiStatusText">Checking API</span>
+        </div>
+    </header>
+
+    <section class="settings" aria-label="Connection settings">
+        <div class="field">
+            <label for="apiUrl">API endpoint</label>
+            <input id="apiUrl" type="text" value="/diagnosis/stream" spellcheck="false">
+        </div>
+        <div class="field">
+            <label for="conversationId">Conversation ID</label>
+            <input id="conversationId" type="text" value="00000000-0000-0000-0000-000000000101" spellcheck="false">
+        </div>
+        <button id="clearButton" class="secondary" type="button">Clear</button>
+    </section>
+
+    <section id="conversation" class="conversation" aria-label="Conversation">
+        <div id="messages" class="messages">
+            <div id="emptyState" class="empty">No messages yet</div>
+        </div>
+    </section>
+
+    <footer class="composer-band">
+        <form id="composer" class="composer">
+            <textarea id="messageInput" aria-label="Message" placeholder="Enter a Java or Spring upgrade question" required></textarea>
+            <button id="sendButton" class="primary" type="submit">Send</button>
+        </form>
+        <div id="requestState" class="request-state" aria-live="polite"></div>
+    </footer>
+</main>
+
+<script>
+    const apiUrl = document.getElementById("apiUrl");
+    const conversationId = document.getElementById("conversationId");
+    const composer = document.getElementById("composer");
+    const messageInput = document.getElementById("messageInput");
+    const sendButton = document.getElementById("sendButton");
+    const clearButton = document.getElementById("clearButton");
+    const messages = document.getElementById("messages");
+    const emptyState = document.getElementById("emptyState");
+    const requestState = document.getElementById("requestState");
+    const conversation = document.getElementById("conversation");
+    const apiStatus = document.getElementById("apiStatus");
+    const apiStatusText = document.getElementById("apiStatusText");
+
+    let activeRequest = null;
+
+    const savedConversationId = localStorage.getItem("spring-agent.conversationId");
+    if (savedConversationId) conversationId.value = savedConversationId;
+
+    function setApiStatus(state, text) {
+        apiStatus.dataset.state = state;
+        apiStatusText.textContent = text;
+    }
+
+    function setRequestState(text, isError = false) {
+        requestState.textContent = text;
+        requestState.classList.toggle("error", isError);
+    }
+
+    function addMessage(role, content = "") {
+        emptyState?.remove();
+        const wrapper = document.createElement("article");
+        wrapper.className = `message ${role}`;
+
+        const meta = document.createElement("div");
+        meta.className = "message-meta";
+        meta.textContent = role === "user" ? "You" : role === "error" ? "Error" : "Spring Agent";
+
+        const body = document.createElement("div");
+        body.className = "message-body";
+        body.textContent = content;
+
+        wrapper.append(meta, body);
+        messages.appendChild(wrapper);
+        conversation.scrollTop = conversation.scrollHeight;
+        return body;
+    }
+
+    function parseEventBlock(block) {
+        let eventName = "message";
+        const data = [];
+        for (const line of block.split(/\r?\n/)) {
+            if (line.startsWith("event:")) eventName = line.slice(6).trim();
+            if (line.startsWith("data:")) data.push(line.slice(5).trimStart());
+        }
+        return { eventName, data: data.join("\n") };
+    }
+
+    function parseEventData(event) {
+        try {
+            return JSON.parse(event.data);
+        } catch (error) {
+            throw new Error(`Invalid ${event.eventName} event payload`);
+        }
+    }
+
+    async function createResponseError(response) {
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+            const payload = await response.json();
+            const fieldErrors = (payload.errors || [])
+                .map(error => `${error.field}: ${error.message}`)
+                .join("; ");
+            const message = fieldErrors
+                ? `${payload.message}: ${fieldErrors}`
+                : payload.message;
+            return new Error(message || `HTTP ${response.status}`);
+        }
+
+        const detail = await response.text();
+        return new Error(`HTTP ${response.status}${detail ? `: ${detail}` : ""}`);
+    }
+
+    async function checkApi() {
+        try {
+            const endpoint = new URL(apiUrl.value, window.location.href);
+            endpoint.pathname = "/diagnosis/health";
+            endpoint.search = "";
+            const response = await fetch(endpoint, { cache: "no-store" });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            setApiStatus("online", "API online");
+        } catch (error) {
+            setApiStatus("offline", "API offline");
+        }
+    }
+
+    async function streamDiagnosis(question) {
+        const id = conversationId.value.trim();
+        if (!id) throw new Error("Conversation ID is required");
+
+        localStorage.setItem("spring-agent.conversationId", id);
+        activeRequest = new AbortController();
+        sendButton.dataset.mode = "stop";
+        sendButton.textContent = "Stop";
+        setApiStatus("busy", "Streaming");
+        setRequestState("Waiting for response");
+
+        const assistantBody = addMessage("assistant");
+        const response = await fetch(apiUrl.value.trim(), {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "text/event-stream, application/json"
+            },
+            body: JSON.stringify({ conversationId: id, input: question }),
+            signal: activeRequest.signal,
+        });
+
+        if (!response.ok) {
+            throw await createResponseError(response);
+        }
+        if (!response.body) throw new Error("Streaming response is unavailable");
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+            const { value, done } = await reader.read();
+            buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+            const blocks = buffer.split(/\r?\n\r?\n/);
+            buffer = blocks.pop() || "";
+
+            for (const block of blocks) {
+                const event = parseEventBlock(block);
+                const envelope = parseEventData(event);
+                if (event.eventName === "meta") {
+                    setRequestState("Connected");
+                } else if (event.eventName === "chunk") {
+                    assistantBody.textContent += envelope.data.content;
+                    conversation.scrollTop = conversation.scrollHeight;
+                } else if (event.eventName === "error") {
+                    assistantBody.closest(".message").classList.add("error");
+                    const message = envelope.data.message || "Diagnosis failed";
+                    assistantBody.textContent = message;
+                    throw new Error(message);
+                } else if (event.eventName === "done") {
+                    setRequestState("Response complete");
+                }
+            }
+            if (done) break;
+        }
+    }
+
+    composer.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (activeRequest) {
+            activeRequest.abort();
+            return;
+        }
+
+        const question = messageInput.value.trim();
+        if (!question) return;
+        addMessage("user", question);
+        messageInput.value = "";
+
+        try {
+            await streamDiagnosis(question);
+            setApiStatus("online", "API online");
+        } catch (error) {
+            if (error.name === "AbortError") {
+                setRequestState("Request stopped");
+            } else {
+                setRequestState(error.message, true);
+                setApiStatus("offline", "Request failed");
+            }
+        } finally {
+            activeRequest = null;
+            sendButton.dataset.mode = "send";
+            sendButton.textContent = "Send";
+            messageInput.focus();
+        }
+    });
+
+    messageInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+            event.preventDefault();
+            composer.requestSubmit();
+        }
+    });
+
+    clearButton.addEventListener("click", () => {
+        messages.replaceChildren();
+        const empty = document.createElement("div");
+        empty.id = "emptyState";
+        empty.className = "empty";
+        empty.textContent = "No messages yet";
+        messages.appendChild(empty);
+        setRequestState("");
+    });
+
+    apiUrl.addEventListener("change", checkApi);
+    checkApi();
+</script>
+</body>
+</html>
