@@ -1,4 +1,10 @@
 package com.springagent.parser;
 
-public interface ProjectArtifactParser {
+import java.io.InputStream;
+
+public interface ProjectArtifactParser<T> {
+
+    ArtifactType supportedType();
+
+    T parse(InputStream input);
 }

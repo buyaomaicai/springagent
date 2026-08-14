@@ -134,6 +134,7 @@ curl.exe -N http://localhost:8080/diagnosis/stream `
 | --- | --- | --- |
 | `GET` | `/diagnosis/health` | 检查诊断服务状态 |
 | `POST` | `/diagnosis/stream` | 发起流式升级诊断 |
+| `POST` | `/project-artifacts/pom` | 上传并解析 Maven `pom.xml` |
 | `GET` | `/admin/message` | 查询用户及其会话列表 |
 | `GET` | `/admin/message/detail/{id}` | 查询指定用户的会话与消息 |
 
@@ -147,6 +148,16 @@ curl.exe -N http://localhost:8080/diagnosis/stream `
 ```
 
 `input` 必填；`conversationId` 用于关联已有会话。
+
+上传 POM 时使用 `multipart/form-data`，文件字段名固定为 `file`：
+
+```powershell
+curl.exe http://localhost:8080/project-artifacts/pom `
+  -F "file=@pom.xml;type=application/xml"
+```
+
+接口会返回项目坐标、Java 与 Spring Boot 版本、直接依赖、模块以及解析 warning。单个 POM
+最大为 1 MiB；格式错误、不安全 XML 和超大文件均使用统一错误响应返回。
 
 ## 配置说明
 

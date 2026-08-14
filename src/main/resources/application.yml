@@ -25,7 +25,30 @@ spring:
         dimensions: 1024
         distance-type: COSINE_DISTANCE
         index-type: HNSW
+  mvc:
+    async:
+      request-timeout: 10m
 
+  servlet:
+    multipart:
+      # 在 MultipartFile 落盘或进入 Parser 前限制上传体积，避免超大请求消耗服务器资源。
+      # Parser 内部仍保留独立的 1 MiB 限制，防止它被非 HTTP 调用方绕过。
+      max-file-size: 1MB
+      # multipart 请求还包含 boundary 和请求头，因此总请求上限略高于单文件上限。
+      max-request-size: 2MB
+
+  task:
+    execution:
+      thread-name-prefix: mvc-async-
+      pool:
+        core-size: 8
+        max-size: 32
+        queue-capacity: 100
+        keep-alive: 60s
+        allow-core-thread-timeout: true
+      shutdown:
+        await-termination: true
+        await-termination-period: 30s
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
   type-handlers-package: com.springagent.common.persistence
