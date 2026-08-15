@@ -9,17 +9,22 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.springagent.common.api.ErrorCode;
+import com.springagent.common.exception.BusinessException;
 import com.springagent.common.exception.GlobalExceptionHandler;
 import com.springagent.common.web.RequestIdContext;
 import com.springagent.common.web.RequestIdFilter;
 import com.springagent.diagnosis.domain.dto.DiagnosisParserDTO;
+import com.springagent.diagnosis.domain.dto.DiagnosisRunDTO;
 import com.springagent.diagnosis.domain.dto.request.DiagnosisRequest;
 import com.springagent.diagnosis.domain.dto.stream.StreamChunk;
 import com.springagent.diagnosis.domain.dto.stream.StreamCompleted;
@@ -73,6 +78,52 @@ class DiagnosisControllerTests {
     @AfterEach
     void tearDown() {
         MDC.remove(RequestIdContext.MDC_KEY);
+    }
+
+    @Test
+    void returnsDiagnosisRunById() throws Exception {
+        DiagnosisRunDTO diagnosisRun = new DiagnosisRunDTO();
+        diagnosisRun.setId(DIAGNOSIS_ID);
+        diagnosisRun.setConversationId(CONVERSATION_ID);
+        diagnosisRun.setStatus("SUCCEEDED");
+        diagnosisRun.setResponse("Upgrade diagnosis result");
+        when(diagnosisService.getRun(DIAGNOSIS_ID))
+                .thenReturn(diagnosisRun);
+
+        mockMvc().perform(get("/diagnosis/runs/{diagnosisId}", DIAGNOSIS_ID)
+                        .header(RequestIdFilter.HEADER_NAME, REQUEST_ID)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.requestId").value(REQUEST_ID))
+                .andExpect(jsonPath("$.data.id").value(DIAGNOSIS_ID.toString()))
+                .andExpect(jsonPath("$.data.conversationId")
+                        .value(CONVERSATION_ID.toString()))
+                .andExpect(jsonPath("$.data.status").value("SUCCEEDED"))
+                .andExpect(jsonPath("$.data.response")
+                        .value("Upgrade diagnosis result"));
+    }
+
+    @Test
+    void returnsNotFoundWhenDiagnosisRunDoesNotExist() throws Exception {
+        when(diagnosisService.getRun(DIAGNOSIS_ID)).thenThrow(
+                new BusinessException(ErrorCode.DIAGNOSIS_RUN_NOT_FOUND)
+        );
+
+        mockMvc().perform(get("/diagnosis/runs/{diagnosisId}", DIAGNOSIS_ID)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code")
+                        .value("DIAGNOSIS_RUN_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("诊断运行不存在"));
+    }
+
+    @Test
+    void rejectsInvalidDiagnosisId() throws Exception {
+        mockMvc().perform(get("/diagnosis/runs/{diagnosisId}", "not-a-uuid")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
     }
 
     @Test

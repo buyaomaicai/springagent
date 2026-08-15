@@ -6,6 +6,7 @@ import com.springagent.common.api.ErrorCode;
 import com.springagent.common.exception.BusinessException;
 import com.springagent.common.web.RequestIdContext;
 import com.springagent.diagnosis.domain.dto.DiagnosisParserDTO;
+import com.springagent.diagnosis.domain.dto.DiagnosisRunDTO;
 import com.springagent.diagnosis.domain.dto.request.DiagnosisParserRequest;
 import com.springagent.diagnosis.domain.dto.request.DiagnosisRequest;
 import com.springagent.diagnosis.domain.dto.response.HealthResponse;
@@ -188,5 +189,8 @@ public class DiagnosisController {
 
         return Flux.concat(Flux.just(metadataEvent), contentEvents);
     }
-
+    @GetMapping("/runs/{diagnosisId}")
+    public ApiResponse<DiagnosisRunDTO> getRun(@PathVariable UUID diagnosisId) {
+        return ApiResponse.success(diagnosisService.getRun(diagnosisId));
+    }
 }

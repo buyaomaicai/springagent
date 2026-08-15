@@ -15,7 +15,10 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.springagent.common.Constant.MessageStatus;
+import com.springagent.common.api.ErrorCode;
+import com.springagent.common.exception.BusinessException;
 import com.springagent.diagnosis.domain.dto.DiagnosisParserDTO;
+import com.springagent.diagnosis.domain.dto.DiagnosisRunDTO;
 import com.springagent.diagnosis.domain.dto.request.DiagnosisRequest;
 import com.springagent.diagnosis.entity.ChatAttachment;
 import com.springagent.diagnosis.entity.ChatConversation;
@@ -27,6 +30,7 @@ import com.springagent.diagnosis.model.DiagnosisStream;
 import com.springagent.diagnosis.model.ProjectInput;
 import com.springagent.diagnosis.service.IChatConversationService;
 import com.springagent.diagnosis.service.IChatMessageService;
+import com.springagent.diagnosis.service.IDiagnosisRunService;
 import com.springagent.diagnosis.tool.DiagnosisPromptBuilder;
 import com.springagent.knowledge.service.KnowledgeRetrievalService;
 import com.springagent.parser.ProjectArtifactParser;
@@ -78,6 +82,9 @@ class DiagnosisServiceImplTests {
     @Mock
     private DiagnosisRunLifecycleService diagnosisRunLifecycleService;
 
+    @Mock
+    private IDiagnosisRunService diagnosisRunService;
+
     private DiagnosisServiceImpl diagnosisService;
     private Prompt prompt;
 
@@ -91,13 +98,14 @@ class DiagnosisServiceImplTests {
                 pomXmlParser,
                 diagnosisPromptBuilder,
                 diagnosisRunLifecycleService,
-                new ObjectMapper()
+                new ObjectMapper(),
+                diagnosisRunService
         );
         prompt = new Prompt("test prompt");
 
-        when(chatConversationService.getOrCreateConversation(any()))
+        lenient().when(chatConversationService.getOrCreateConversation(any()))
                 .thenReturn(new ChatConversation().setId(CONVERSATION_ID));
-        when(chatMessageService.gethistory(CONVERSATION_ID))
+        lenient().when(chatMessageService.gethistory(CONVERSATION_ID))
                 .thenReturn(List.of());
         lenient().when(knowledgeRetrievalService.searchSpringBoot30(any()))
                 .thenReturn(List.of());
@@ -105,6 +113,75 @@ class DiagnosisServiceImplTests {
                         any(DiagnosisPromptContext.class)
                 ))
                 .thenReturn(prompt);
+    }
+
+    @Test
+    void returnsDiagnosisRunWithAssociatedResponse() {
+        UUID diagnosisId = UUID.randomUUID();
+        UUID responseMessageId = UUID.randomUUID();
+        OffsetDateTime createdAt = OffsetDateTime.now().minusMinutes(1);
+        OffsetDateTime startedAt = createdAt.plusSeconds(2);
+        OffsetDateTime completedAt = startedAt.plusSeconds(10);
+        DiagnosisRun run = new DiagnosisRun()
+                .setId(diagnosisId)
+                .setConversationId(CONVERSATION_ID)
+                .setResponseMessageId(responseMessageId)
+                .setQuestion("How should I upgrade?")
+                .setStatus(DiagnosisRunStatus.SUCCEEDED.name())
+                .setModelProvider("DeepSeek")
+                .setModelName("deepseek-chat")
+                .setPromptVersion("diagnosis-v1")
+                .setStartedAt(startedAt)
+                .setCompletedAt(completedAt)
+                .setCreatedAt(createdAt);
+        ChatMessage responseMessage = new ChatMessage()
+                .setId(responseMessageId)
+                .setContent("Upgrade diagnosis result");
+        when(diagnosisRunService.getById(diagnosisId)).thenReturn(run);
+        when(chatMessageService.getById(responseMessageId))
+                .thenReturn(responseMessage);
+
+        DiagnosisRunDTO result = diagnosisService.getRun(diagnosisId);
+
+        assertEquals(diagnosisId, result.getId());
+        assertEquals(CONVERSATION_ID, result.getConversationId());
+        assertEquals("How should I upgrade?", result.getQuestion());
+        assertEquals(DiagnosisRunStatus.SUCCEEDED.name(), result.getStatus());
+        assertEquals("Upgrade diagnosis result", result.getResponse());
+        assertEquals(createdAt, result.getCreatedAt());
+        assertEquals(startedAt, result.getStartedAt());
+        assertEquals(completedAt, result.getCompletedAt());
+    }
+
+    @Test
+    void rejectsMissingDiagnosisRun() {
+        UUID diagnosisId = UUID.randomUUID();
+        when(diagnosisRunService.getById(diagnosisId)).thenReturn(null);
+
+        BusinessException error = assertThrows(
+                BusinessException.class,
+                () -> diagnosisService.getRun(diagnosisId)
+        );
+
+        assertEquals(ErrorCode.DIAGNOSIS_RUN_NOT_FOUND, error.getErrorCode());
+    }
+
+    @Test
+    void reportsInternalErrorWhenResponseMessageIsMissing() {
+        UUID diagnosisId = UUID.randomUUID();
+        UUID responseMessageId = UUID.randomUUID();
+        DiagnosisRun run = new DiagnosisRun()
+                .setId(diagnosisId)
+                .setResponseMessageId(responseMessageId);
+        when(diagnosisRunService.getById(diagnosisId)).thenReturn(run);
+        when(chatMessageService.getById(responseMessageId)).thenReturn(null);
+
+        BusinessException error = assertThrows(
+                BusinessException.class,
+                () -> diagnosisService.getRun(diagnosisId)
+        );
+
+        assertEquals(ErrorCode.INTERNAL_SERVER_ERROR, error.getErrorCode());
     }
 
     @Test

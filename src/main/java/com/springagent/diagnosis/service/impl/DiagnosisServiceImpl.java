@@ -1,11 +1,15 @@
 package com.springagent.diagnosis.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollectionUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.springagent.common.Constant.MessageStatus;
 import com.springagent.common.Constant.SenderRole;
+import com.springagent.common.api.ErrorCode;
+import com.springagent.common.exception.BusinessException;
 import com.springagent.diagnosis.domain.dto.DiagnosisParserDTO;
+import com.springagent.diagnosis.domain.dto.DiagnosisRunDTO;
 import com.springagent.diagnosis.domain.dto.request.DiagnosisRequest;
 import com.springagent.diagnosis.entity.ChatAttachment;
 import com.springagent.diagnosis.entity.ChatConversation;
@@ -17,6 +21,7 @@ import com.springagent.diagnosis.model.DiagnosisStream;
 import com.springagent.diagnosis.model.ProjectInput;
 import com.springagent.diagnosis.service.IChatConversationService;
 import com.springagent.diagnosis.service.IChatMessageService;
+import com.springagent.diagnosis.service.IDiagnosisRunService;
 import com.springagent.diagnosis.service.IDiagnosisService;
 import com.springagent.diagnosis.tool.DiagnosisPromptBuilder;
 import com.springagent.knowledge.service.KnowledgeRetrievalService;
@@ -66,6 +71,7 @@ public class DiagnosisServiceImpl implements IDiagnosisService {
     private final DiagnosisPromptBuilder diagnosisPromptBuilder;
     private final DiagnosisRunLifecycleService diagnosisRunLifecycleService;
     private final ObjectMapper objectMapper;
+    private final IDiagnosisRunService diagnosisRunService;
 
     private record PreparedDiagnosis(Prompt prompt, DiagnosisRun diagnosisRun) {
     }
@@ -114,6 +120,26 @@ public class DiagnosisServiceImpl implements IDiagnosisService {
                 attachment
         );
         return toDiagnosisStream(conversation, prepared);
+    }
+
+    @Override
+    public DiagnosisRunDTO getRun(UUID diagnosisId) {
+        DiagnosisRun byId = diagnosisRunService.getById(diagnosisId);
+        if (byId == null){
+            throw  new BusinessException(ErrorCode.DIAGNOSIS_RUN_NOT_FOUND,"诊断不存在");
+        }
+        DiagnosisRunDTO diagnosisRunDTO = BeanUtil.copyProperties(byId, DiagnosisRunDTO.class);
+        ChatMessage msg = chatMessageService.getById(byId.getResponseMessageId());
+        if(msg == null){
+            log.error(
+                    "Diagnosis response message missing, diagnosisId={}, responseMessageId={}",
+                    byId.getId(),
+                    byId.getResponseMessageId()
+            );
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+        diagnosisRunDTO.setResponse(msg.getContent());
+        return diagnosisRunDTO;
     }
 
     /**
