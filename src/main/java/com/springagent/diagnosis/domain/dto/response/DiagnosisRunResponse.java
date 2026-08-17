@@ -1,4 +1,4 @@
-package com.springagent.diagnosis.domain.dto;
+package com.springagent.diagnosis.domain.dto.response;
 
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -7,7 +7,7 @@ import lombok.Data;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 @Data
-public class DiagnosisRunDTO {
+public class DiagnosisRunResponse {
     private UUID id;
 
     private UUID conversationId;

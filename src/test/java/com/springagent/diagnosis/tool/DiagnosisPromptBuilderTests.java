@@ -22,6 +22,7 @@ import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.document.Document;
+import org.springframework.core.io.ClassPathResource;
 
 class DiagnosisPromptBuilderTests {
 
@@ -31,7 +32,11 @@ class DiagnosisPromptBuilderTests {
     void setUp() {
         ProjectContextFormatter formatter =
                 new ProjectContextFormatter(new ObjectMapper());
-        promptBuilder = new DiagnosisPromptBuilder(formatter);
+        promptBuilder = new DiagnosisPromptBuilder(
+                formatter,
+                new ClassPathResource("prompts/diagnosis/system.st"),
+                new ClassPathResource("prompts/diagnosis/user.st")
+        );
     }
 
     @Test
@@ -89,6 +94,21 @@ class DiagnosisPromptBuilderTests {
         assertTrue(text.contains("<reference>"));
         assertTrue(text.contains("Spring Boot 3.4 migration guide"));
         assertFalse(text.contains("\"status\": \"NOT_PROVIDED\""));
+        assertFalse(text.contains("$projectContext$"));
+
+        String systemText = assertInstanceOf(
+                SystemMessage.class,
+                messages.get(0)
+        ).getText();
+        assertTrue(
+                systemText.contains("只能输出一个合法 JSON 对象"),
+                systemText
+        );
+        assertTrue(systemText.contains("\"compatibilityIssues\""));
+        assertTrue(systemText.contains("LOW | MEDIUM | HIGH | CRITICAL"));
+        assertTrue(systemText.contains(
+                "PREPARATION | BUILD | SOURCE_CODE | DATA | TESTING"
+        ));
     }
 
     @Test

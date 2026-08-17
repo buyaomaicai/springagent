@@ -3,10 +3,14 @@ package com.springagent.diagnosis.controller;
 import cn.hutool.core.bean.BeanUtil;
 import com.springagent.common.api.ApiResponse;
 import com.springagent.common.api.ErrorCode;
+import com.springagent.common.api.PageResponse;
 import com.springagent.common.exception.BusinessException;
 import com.springagent.common.web.RequestIdContext;
 import com.springagent.diagnosis.domain.dto.DiagnosisParserDTO;
-import com.springagent.diagnosis.domain.dto.DiagnosisRunDTO;
+import com.springagent.diagnosis.domain.dto.request.DiagnosisRunQueryRequest;
+import com.springagent.diagnosis.domain.dto.response.DiagnosisResultResponse;
+import com.springagent.diagnosis.domain.dto.response.DiagnosisRunResponse;
+import com.springagent.diagnosis.domain.dto.response.DiagnosisRunSummaryResponse;
 import com.springagent.diagnosis.domain.dto.request.DiagnosisParserRequest;
 import com.springagent.diagnosis.domain.dto.request.DiagnosisRequest;
 import com.springagent.diagnosis.domain.dto.response.HealthResponse;
@@ -16,6 +20,7 @@ import com.springagent.diagnosis.domain.dto.stream.StreamError;
 import com.springagent.diagnosis.domain.dto.stream.StreamEvent;
 import com.springagent.diagnosis.domain.dto.stream.StreamMetadata;
 import com.springagent.diagnosis.model.DiagnosisStream;
+import com.springagent.diagnosis.service.IDiagnosisResultQueryService;
 import com.springagent.diagnosis.service.IDiagnosisService;
 import jakarta.validation.Valid;
 
@@ -39,6 +44,7 @@ public class DiagnosisController {
     private static final String STREAM_PROTOCOL_VERSION = "1.0";
 
     private final IDiagnosisService diagnosisService;
+    private final IDiagnosisResultQueryService diagnosisResultQueryService;
 
     @GetMapping("/health")
     public ApiResponse<HealthResponse> healthCheck() {
@@ -189,8 +195,32 @@ public class DiagnosisController {
 
         return Flux.concat(Flux.just(metadataEvent), contentEvents);
     }
+
+    @GetMapping("/runs")
+    public ApiResponse<PageResponse<DiagnosisRunSummaryResponse>> listRuns(
+            @ModelAttribute @Valid DiagnosisRunQueryRequest request
+    ) {
+        return ApiResponse.success(
+                diagnosisResultQueryService.listRuns(
+                        request.getConversationId(),
+                        request.getPage(),
+                        request.getSize(),
+                        request.getStatus()
+                )
+        );
+    }
+
     @GetMapping("/runs/{diagnosisId}")
-    public ApiResponse<DiagnosisRunDTO> getRun(@PathVariable UUID diagnosisId) {
+    public ApiResponse<DiagnosisRunResponse> getRun(@PathVariable UUID diagnosisId) {
         return ApiResponse.success(diagnosisService.getRun(diagnosisId));
+    }
+
+    @GetMapping("/runs/{diagnosisId}/result")
+    public ApiResponse<DiagnosisResultResponse> getResult(
+            @PathVariable UUID diagnosisId
+    ) {
+        return ApiResponse.success(
+                diagnosisResultQueryService.getResult(diagnosisId)
+        );
     }
 }

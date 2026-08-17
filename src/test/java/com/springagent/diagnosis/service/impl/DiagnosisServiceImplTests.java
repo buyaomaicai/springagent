@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -17,8 +19,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.springagent.common.Constant.MessageStatus;
 import com.springagent.common.api.ErrorCode;
 import com.springagent.common.exception.BusinessException;
+import com.springagent.common.exception.DiagnosisResultParseException;
+import com.springagent.common.exception.DiagnosisResultPersistenceException;
 import com.springagent.diagnosis.domain.dto.DiagnosisParserDTO;
-import com.springagent.diagnosis.domain.dto.DiagnosisRunDTO;
+import com.springagent.diagnosis.domain.dto.result.DiagnosisResult;
+import com.springagent.diagnosis.domain.dto.result.UpgradeTarget;
+import com.springagent.diagnosis.domain.dto.response.DiagnosisRunResponse;
 import com.springagent.diagnosis.domain.dto.request.DiagnosisRequest;
 import com.springagent.diagnosis.entity.ChatAttachment;
 import com.springagent.diagnosis.entity.ChatConversation;
@@ -30,7 +36,9 @@ import com.springagent.diagnosis.model.DiagnosisStream;
 import com.springagent.diagnosis.model.ProjectInput;
 import com.springagent.diagnosis.service.IChatConversationService;
 import com.springagent.diagnosis.service.IChatMessageService;
+import com.springagent.diagnosis.service.IDiagnosisResultPersistenceService;
 import com.springagent.diagnosis.service.IDiagnosisRunService;
+import com.springagent.diagnosis.service.IDiagnosisResultStructuringService;
 import com.springagent.diagnosis.tool.DiagnosisPromptBuilder;
 import com.springagent.knowledge.service.KnowledgeRetrievalService;
 import com.springagent.parser.ProjectArtifactParser;
@@ -62,6 +70,14 @@ class DiagnosisServiceImplTests {
     );
 
     @Mock
+    private IDiagnosisResultStructuringService
+            diagnosisResultStructuringService;
+
+    @Mock
+    private IDiagnosisResultPersistenceService
+            diagnosisResultPersistenceService;
+
+    @Mock
     private DeepSeekChatModel chatModel;
 
     @Mock
@@ -91,6 +107,8 @@ class DiagnosisServiceImplTests {
     @BeforeEach
     void setUp() {
         diagnosisService = new DiagnosisServiceImpl(
+                diagnosisResultStructuringService,
+                diagnosisResultPersistenceService,
                 chatModel,
                 chatConversationService,
                 chatMessageService,
@@ -141,7 +159,7 @@ class DiagnosisServiceImplTests {
         when(chatMessageService.getById(responseMessageId))
                 .thenReturn(responseMessage);
 
-        DiagnosisRunDTO result = diagnosisService.getRun(diagnosisId);
+        DiagnosisRunResponse result = diagnosisService.getRun(diagnosisId);
 
         assertEquals(diagnosisId, result.getId());
         assertEquals(CONVERSATION_ID, result.getConversationId());
@@ -186,10 +204,13 @@ class DiagnosisServiceImplTests {
 
     @Test
     void createsRunAndMarksItSucceededAfterModelCompletes() {
+        DiagnosisResult result = diagnosisResult();
         when(chatModel.stream(prompt)).thenReturn(Flux.just(
                 response("first"),
                 response(" second")
         ));
+        when(diagnosisResultStructuringService.structure("first second"))
+                .thenReturn(result);
 
         DiagnosisStream stream = diagnosisService.callDiagnosis(request());
 
@@ -213,9 +234,85 @@ class DiagnosisServiceImplTests {
 
         verify(diagnosisRunLifecycleService)
                 .markRunning(prepared.run());
-        verify(diagnosisRunLifecycleService).markSucceeded(
+        verify(diagnosisResultStructuringService)
+                .structure("first second");
+        verify(diagnosisResultPersistenceService).save(
                 eq(prepared.run()),
+                eq(result),
                 eq("first second"),
+                any(OffsetDateTime.class)
+        );
+    }
+
+    @Test
+    void marksRunFailedWhenStructuredResultCannotBeParsed() {
+        DiagnosisResultParseException parseError =
+                new DiagnosisResultParseException("模型输出不是合法 JSON");
+        when(chatModel.stream(prompt)).thenReturn(
+                Flux.just(response("invalid json"))
+        );
+        when(diagnosisResultStructuringService.structure("invalid json"))
+                .thenThrow(parseError);
+
+        DiagnosisStream stream = diagnosisService.callDiagnosis(request());
+
+        DiagnosisResultParseException actualError = assertThrows(
+                DiagnosisResultParseException.class,
+                () -> stream.content().blockLast(Duration.ofSeconds(1))
+        );
+
+        assertSame(parseError, actualError);
+        PreparedObjects prepared = captureCreatedRun();
+        verify(diagnosisRunLifecycleService).markFailed(
+                eq(prepared.run()),
+                eq("invalid json"),
+                eq("DIAGNOSIS_RESULT_PARSE_FAILED"),
+                eq("模型输出不是合法 JSON"),
+                any(OffsetDateTime.class)
+        );
+        verify(diagnosisRunLifecycleService, never()).markSucceeded(
+                any(),
+                any(),
+                any(OffsetDateTime.class)
+        );
+        verify(diagnosisResultPersistenceService, never()).save(
+                any(),
+                any(),
+                any(),
+                any(OffsetDateTime.class)
+        );
+    }
+
+    @Test
+    void marksRunFailedWhenSuccessfulResultCannotBePersisted() {
+        when(chatModel.stream(prompt)).thenReturn(
+                Flux.just(response("valid json"))
+        );
+        when(diagnosisResultStructuringService.structure("valid json"))
+                .thenReturn(diagnosisResult());
+        doThrow(new IllegalStateException("database unavailable"))
+                .when(diagnosisResultPersistenceService)
+                .save(
+                        any(DiagnosisRun.class),
+                        any(DiagnosisResult.class),
+                        eq("valid json"),
+                        any(OffsetDateTime.class)
+                );
+
+        DiagnosisStream stream = diagnosisService.callDiagnosis(request());
+
+        DiagnosisResultPersistenceException actualError = assertThrows(
+                DiagnosisResultPersistenceException.class,
+                () -> stream.content().blockLast(Duration.ofSeconds(1))
+        );
+
+        assertTrue(actualError.getCause() instanceof IllegalStateException);
+        PreparedObjects prepared = captureCreatedRun();
+        verify(diagnosisRunLifecycleService).markFailed(
+                eq(prepared.run()),
+                eq("valid json"),
+                eq("DIAGNOSIS_RESULT_PERSIST_FAILED"),
+                eq("结构化诊断结果持久化失败"),
                 any(OffsetDateTime.class)
         );
     }
@@ -349,6 +446,17 @@ class DiagnosisServiceImplTests {
         return new ChatResponse(List.of(
                 new Generation(new AssistantMessage(text))
         ));
+    }
+
+    private DiagnosisResult diagnosisResult() {
+        return new DiagnosisResult(
+                "Upgrade is feasible",
+                new UpgradeTarget("17", "3.2.0"),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of()
+        );
     }
 
     private PreparedObjects captureCreatedRun() {

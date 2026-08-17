@@ -19,12 +19,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.springagent.common.api.ErrorCode;
+import com.springagent.common.api.PageResponse;
 import com.springagent.common.exception.BusinessException;
 import com.springagent.common.exception.GlobalExceptionHandler;
 import com.springagent.common.web.RequestIdContext;
 import com.springagent.common.web.RequestIdFilter;
 import com.springagent.diagnosis.domain.dto.DiagnosisParserDTO;
-import com.springagent.diagnosis.domain.dto.DiagnosisRunDTO;
+import com.springagent.diagnosis.domain.dto.response.DiagnosisResultResponse;
+import com.springagent.diagnosis.domain.dto.response.DiagnosisRunResponse;
+import com.springagent.diagnosis.domain.dto.response.DiagnosisRunSummaryResponse;
+import com.springagent.diagnosis.domain.dto.response.UpgradeTargetResponse;
 import com.springagent.diagnosis.domain.dto.request.DiagnosisRequest;
 import com.springagent.diagnosis.domain.dto.stream.StreamChunk;
 import com.springagent.diagnosis.domain.dto.stream.StreamCompleted;
@@ -32,8 +36,11 @@ import com.springagent.diagnosis.domain.dto.stream.StreamError;
 import com.springagent.diagnosis.domain.dto.stream.StreamEvent;
 import com.springagent.diagnosis.domain.dto.stream.StreamMetadata;
 import com.springagent.diagnosis.model.DiagnosisStream;
+import com.springagent.diagnosis.model.DiagnosisRunStatus;
+import com.springagent.diagnosis.service.IDiagnosisResultQueryService;
 import com.springagent.diagnosis.service.IDiagnosisService;
 import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
@@ -67,11 +74,17 @@ class DiagnosisControllerTests {
     @Mock
     private IDiagnosisService diagnosisService;
 
+    @Mock
+    private IDiagnosisResultQueryService diagnosisResultQueryService;
+
     private DiagnosisController controller;
 
     @BeforeEach
     void setUp() {
-        controller = new DiagnosisController(diagnosisService);
+        controller = new DiagnosisController(
+                diagnosisService,
+                diagnosisResultQueryService
+        );
         MDC.put(RequestIdContext.MDC_KEY, REQUEST_ID);
     }
 
@@ -81,8 +94,102 @@ class DiagnosisControllerTests {
     }
 
     @Test
+    void returnsPagedDiagnosisHistory() throws Exception {
+        OffsetDateTime createdAt = OffsetDateTime.parse(
+                "2026-08-16T12:00:00Z"
+        );
+        DiagnosisRunSummaryResponse summary =
+                new DiagnosisRunSummaryResponse(
+                        DIAGNOSIS_ID,
+                        CONVERSATION_ID,
+                        "Upgrade Spring Boot",
+                        DiagnosisRunStatus.SUCCEEDED,
+                        "Upgrade is feasible",
+                        new UpgradeTargetResponse("21", "4.0"),
+                        null,
+                        createdAt.plusSeconds(1),
+                        createdAt.plusSeconds(10),
+                        createdAt
+                );
+        PageResponse<DiagnosisRunSummaryResponse> page =
+                new PageResponse<>(List.of(summary), 1, 1, 20, 1);
+        when(diagnosisResultQueryService.listRuns(
+                CONVERSATION_ID,
+                1,
+                20,
+                null
+        )).thenReturn(page);
+
+        mockMvc().perform(get("/diagnosis/runs")
+                        .param("conversationId", CONVERSATION_ID.toString())
+                        .header(RequestIdFilter.HEADER_NAME, REQUEST_ID)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.requestId").value(REQUEST_ID))
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.page").value(1))
+                .andExpect(jsonPath("$.data.size").value(20))
+                .andExpect(jsonPath("$.data.totalPages").value(1))
+                .andExpect(jsonPath("$.data.items[0].diagnosisId")
+                        .value(DIAGNOSIS_ID.toString()))
+                .andExpect(jsonPath("$.data.items[0].status")
+                        .value("SUCCEEDED"))
+                .andExpect(jsonPath(
+                        "$.data.items[0].target.javaVersion"
+                ).value("21"));
+    }
+
+    @Test
+    void forwardsHistoryStatusFilter() throws Exception {
+        when(diagnosisResultQueryService.listRuns(
+                CONVERSATION_ID,
+                2,
+                10,
+                DiagnosisRunStatus.FAILED
+        )).thenReturn(new PageResponse<>(List.of(), 0, 2, 10, 0));
+
+        mockMvc().perform(get("/diagnosis/runs")
+                        .param("conversationId", CONVERSATION_ID.toString())
+                        .param("page", "2")
+                        .param("size", "10")
+                        .param("status", "FAILED")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items").isEmpty());
+
+        verify(diagnosisResultQueryService).listRuns(
+                CONVERSATION_ID,
+                2,
+                10,
+                DiagnosisRunStatus.FAILED
+        );
+    }
+
+    @Test
+    void rejectsInvalidHistoryPagination() throws Exception {
+        mockMvc().perform(get("/diagnosis/runs")
+                        .param("conversationId", CONVERSATION_ID.toString())
+                        .param("size", "101")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.errors[0].field").value("size"));
+    }
+
+    @Test
+    void rejectsHistoryQueryWithoutConversationId() throws Exception {
+        mockMvc().perform(get("/diagnosis/runs")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.errors[0].field")
+                        .value("conversationId"));
+    }
+
+    @Test
     void returnsDiagnosisRunById() throws Exception {
-        DiagnosisRunDTO diagnosisRun = new DiagnosisRunDTO();
+        DiagnosisRunResponse diagnosisRun = new DiagnosisRunResponse();
         diagnosisRun.setId(DIAGNOSIS_ID);
         diagnosisRun.setConversationId(CONVERSATION_ID);
         diagnosisRun.setStatus("SUCCEEDED");
@@ -124,6 +231,57 @@ class DiagnosisControllerTests {
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
+    void returnsStructuredDiagnosisResult() throws Exception {
+        DiagnosisResultResponse result = new DiagnosisResultResponse(
+                DIAGNOSIS_ID,
+                "Upgrade is feasible",
+                new UpgradeTargetResponse("17", "3.2.0"),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of()
+        );
+        when(diagnosisResultQueryService.getResult(DIAGNOSIS_ID))
+                .thenReturn(result);
+
+        mockMvc().perform(get(
+                        "/diagnosis/runs/{diagnosisId}/result",
+                        DIAGNOSIS_ID
+                ).header(RequestIdFilter.HEADER_NAME, REQUEST_ID)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.requestId").value(REQUEST_ID))
+                .andExpect(jsonPath("$.data.diagnosisId")
+                        .value(DIAGNOSIS_ID.toString()))
+                .andExpect(jsonPath("$.data.summary")
+                        .value("Upgrade is feasible"))
+                .andExpect(jsonPath("$.data.target.javaVersion")
+                        .value("17"))
+                .andExpect(jsonPath("$.data.target.springBootVersion")
+                        .value("3.2.0"))
+                .andExpect(jsonPath("$.data.risks").isArray())
+                .andExpect(jsonPath("$.data.planSteps").isArray());
+    }
+
+    @Test
+    void returnsConflictWhenStructuredResultIsNotReady() throws Exception {
+        when(diagnosisResultQueryService.getResult(DIAGNOSIS_ID))
+                .thenThrow(new BusinessException(
+                        ErrorCode.CONFLICT,
+                        "诊断尚未完成"
+                ));
+
+        mockMvc().perform(get(
+                        "/diagnosis/runs/{diagnosisId}/result",
+                        DIAGNOSIS_ID
+                ).accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CONFLICT"))
+                .andExpect(jsonPath("$.message").value("诊断尚未完成"));
     }
 
     @Test

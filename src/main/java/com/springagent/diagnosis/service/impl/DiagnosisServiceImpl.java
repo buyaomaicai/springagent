@@ -8,9 +8,12 @@ import com.springagent.common.Constant.MessageStatus;
 import com.springagent.common.Constant.SenderRole;
 import com.springagent.common.api.ErrorCode;
 import com.springagent.common.exception.BusinessException;
+import com.springagent.common.exception.DiagnosisResultParseException;
+import com.springagent.common.exception.DiagnosisResultPersistenceException;
 import com.springagent.diagnosis.domain.dto.DiagnosisParserDTO;
-import com.springagent.diagnosis.domain.dto.DiagnosisRunDTO;
 import com.springagent.diagnosis.domain.dto.request.DiagnosisRequest;
+import com.springagent.diagnosis.domain.dto.response.DiagnosisRunResponse;
+import com.springagent.diagnosis.domain.dto.result.DiagnosisResult;
 import com.springagent.diagnosis.entity.ChatAttachment;
 import com.springagent.diagnosis.entity.ChatConversation;
 import com.springagent.diagnosis.entity.ChatMessage;
@@ -21,6 +24,8 @@ import com.springagent.diagnosis.model.DiagnosisStream;
 import com.springagent.diagnosis.model.ProjectInput;
 import com.springagent.diagnosis.service.IChatConversationService;
 import com.springagent.diagnosis.service.IChatMessageService;
+import com.springagent.diagnosis.service.IDiagnosisResultPersistenceService;
+import com.springagent.diagnosis.service.IDiagnosisResultStructuringService;
 import com.springagent.diagnosis.service.IDiagnosisRunService;
 import com.springagent.diagnosis.service.IDiagnosisService;
 import com.springagent.diagnosis.tool.DiagnosisPromptBuilder;
@@ -41,6 +46,7 @@ import org.springframework.ai.deepseek.DeepSeekChatModel;
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 /**
@@ -57,12 +63,20 @@ import reactor.core.scheduler.Schedulers;
 public class DiagnosisServiceImpl implements IDiagnosisService {
 
     private static final String MODEL_PROVIDER = "DeepSeek";
-    private static final String PROMPT_VERSION = "diagnosis-v1";
+    private static final String PROMPT_VERSION = "diagnosis-v2";
     private static final String PREPARATION_ERROR_CODE =
             "DIAGNOSIS_PREPARATION_FAILED";
     private static final String STREAM_ERROR_CODE = "MODEL_STREAM_FAILED";
+    private static final String RESULT_PARSE_ERROR_CODE =
+            "DIAGNOSIS_RESULT_PARSE_FAILED";
+    private static final String RESULT_PERSIST_ERROR_CODE =
+            "DIAGNOSIS_RESULT_PERSIST_FAILED";
     private static final String CANCEL_DETAIL = "客户端取消了诊断流";
 
+    private final IDiagnosisResultStructuringService
+            diagnosisResultStructuringService;
+    private final IDiagnosisResultPersistenceService
+            diagnosisResultPersistenceService;
     private final DeepSeekChatModel chatModel;
     private final IChatConversationService chatConversationService;
     private final IChatMessageService chatMessageService;
@@ -123,12 +137,12 @@ public class DiagnosisServiceImpl implements IDiagnosisService {
     }
 
     @Override
-    public DiagnosisRunDTO getRun(UUID diagnosisId) {
+    public DiagnosisRunResponse getRun(UUID diagnosisId) {
         DiagnosisRun byId = diagnosisRunService.getById(diagnosisId);
         if (byId == null){
             throw  new BusinessException(ErrorCode.DIAGNOSIS_RUN_NOT_FOUND,"诊断不存在");
         }
-        DiagnosisRunDTO diagnosisRunDTO = BeanUtil.copyProperties(byId, DiagnosisRunDTO.class);
+        DiagnosisRunResponse diagnosisRunDTO = BeanUtil.copyProperties(byId, DiagnosisRunResponse.class);
         ChatMessage msg = chatMessageService.getById(byId.getResponseMessageId());
         if(msg == null){
             log.error(
@@ -249,7 +263,7 @@ public class DiagnosisServiceImpl implements IDiagnosisService {
             StringBuilder fullContent = new StringBuilder();
             DiagnosisRun diagnosisRun = prepared.diagnosisRun();
 
-            return Flux.defer(() -> {
+            Flux<String> modelStream = Flux.defer(() -> {
                         diagnosisRun.setStartedAt(OffsetDateTime.now());
                         diagnosisRunLifecycleService.markRunning(diagnosisRun);
                         return chatModel.stream(prepared.prompt());
@@ -257,13 +271,25 @@ public class DiagnosisServiceImpl implements IDiagnosisService {
                     .publishOn(Schedulers.boundedElastic())
                     .map(this::extractText)
                     .filter(text -> !text.isEmpty())
-                    .doOnNext(fullContent::append)
-                    .doOnComplete(() -> diagnosisRunLifecycleService
-                            .markSucceeded(
-                                    diagnosisRun,
-                                    fullContent.toString(),
-                                    OffsetDateTime.now()
-                            ))
+                    .doOnNext(fullContent::append);
+
+            return modelStream
+                    .concatWith(Mono.defer(() -> {
+                        String modelOutput = fullContent.toString();
+
+                        DiagnosisResult result =
+                                diagnosisResultStructuringService.structure(
+                                        modelOutput
+                                );
+
+                        persistSuccessfulRun(
+                                diagnosisRun,
+                                result,
+                                modelOutput
+                        );
+
+                        return Mono.<String>empty();
+                    }))
                     .doOnError(error -> persistFailure(
                             diagnosisRun,
                             fullContent.toString(),
@@ -288,7 +314,7 @@ public class DiagnosisServiceImpl implements IDiagnosisService {
             diagnosisRunLifecycleService.markFailed(
                     diagnosisRun,
                     partialContent,
-                    STREAM_ERROR_CODE,
+                    failureErrorCode(error),
                     errorMessage(error),
                     OffsetDateTime.now()
             );
@@ -299,6 +325,43 @@ public class DiagnosisServiceImpl implements IDiagnosisService {
                     persistenceError
             );
         }
+    }
+
+    /**
+     * 将完成阶段的数据库异常包装为独立类型，避免与模型流异常混淆。
+     */
+    private void persistSuccessfulRun(
+            DiagnosisRun diagnosisRun,
+            DiagnosisResult result,
+            String modelOutput
+    ) {
+        try {
+            diagnosisResultPersistenceService.save(
+                    diagnosisRun,
+                    result,
+                    modelOutput,
+                    OffsetDateTime.now()
+            );
+        } catch (RuntimeException error) {
+            throw new DiagnosisResultPersistenceException(
+                    "结构化诊断结果持久化失败",
+                    error
+            );
+        }
+    }
+
+    private String failureErrorCode(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof DiagnosisResultParseException) {
+                return RESULT_PARSE_ERROR_CODE;
+            }
+            if (current instanceof DiagnosisResultPersistenceException) {
+                return RESULT_PERSIST_ERROR_CODE;
+            }
+            current = current.getCause();
+        }
+        return STREAM_ERROR_CODE;
     }
 
     /**

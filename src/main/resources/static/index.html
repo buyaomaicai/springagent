@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Spring Agent Test Console</title>
+    <title>Spring Agent 升级诊断</title>
     <style>
         :root {
             color-scheme: light;
@@ -37,6 +37,7 @@
             font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
             font-size: 14px;
             letter-spacing: 0;
+            overflow: hidden;
         }
 
         button,
@@ -61,8 +62,8 @@
 
         .app {
             display: grid;
-            grid-template-rows: auto auto minmax(0, 1fr) auto;
-            min-height: 100%;
+            grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+            height: 100dvh;
         }
 
         .topbar {
@@ -165,8 +166,401 @@
             background: #f5f7f9;
         }
 
-        .conversation {
+        .secondary:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .project-context {
+            display: grid;
+            grid-template-columns: minmax(250px, 0.7fr) minmax(420px, 1.3fr);
+            gap: 20px;
+            align-items: center;
+            min-height: 72px;
+            padding: 12px 24px;
+            border-bottom: 1px solid var(--line);
+            background: #f8fafb;
+        }
+
+        .project-control {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            min-width: 0;
+        }
+
+        .project-heading {
+            display: grid;
+            gap: 3px;
+            min-width: 0;
+        }
+
+        .project-heading strong {
+            font-size: 13px;
+        }
+
+        .pom-status {
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .pom-status[data-state="parsing"] {
+            color: var(--warning);
+        }
+
+        .pom-status[data-state="ready"] {
+            color: var(--accent);
+        }
+
+        .pom-status[data-state="error"] {
+            color: var(--danger);
+        }
+
+        .pom-actions {
+            display: flex;
+            gap: 8px;
+            flex: 0 0 auto;
+        }
+
+        .file-trigger,
+        .pom-remove {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 34px;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            background: #fff;
+            color: #34404c;
+            padding: 0 11px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .file-trigger:hover,
+        .pom-remove:hover {
+            background: #f1f4f6;
+        }
+
+        .file-trigger:focus-within {
+            outline: 3px solid rgba(22, 121, 75, 0.18);
+            outline-offset: 1px;
+        }
+
+        .pom-remove {
+            color: var(--danger);
+        }
+
+        .pom-remove[hidden] {
+            display: none;
+        }
+
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        .pom-preview {
+            min-width: 0;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .pom-preview[data-state="error"] {
+            color: var(--danger);
+        }
+
+        .pom-preview-header {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            min-width: 0;
+            margin-bottom: 8px;
+        }
+
+        .pom-preview-header strong {
+            overflow: hidden;
+            color: var(--text);
+            font-size: 12px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .pom-preview-header span {
+            flex: 0 0 auto;
+            font-size: 10px;
+        }
+
+        .pom-facts {
+            display: grid;
+            grid-template-columns: minmax(160px, 1.5fr) repeat(3, minmax(90px, 0.75fr));
+            gap: 6px;
+        }
+
+        .pom-fact {
+            min-width: 0;
+            padding-right: 8px;
+            border-right: 1px solid var(--line);
+        }
+
+        .pom-fact:last-child {
+            border-right: 0;
+        }
+
+        .pom-fact span,
+        .pom-fact strong {
+            display: block;
+        }
+
+        .pom-fact span {
+            margin-bottom: 2px;
+            color: var(--muted);
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .pom-fact strong {
+            overflow: hidden;
+            color: #34404c;
+            font-family: Consolas, "SFMono-Regular", monospace;
+            font-size: 11px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .pom-warning {
+            margin-top: 7px;
+            color: var(--warning);
+            line-height: 1.45;
+            overflow-wrap: anywhere;
+        }
+
+        .message-attachment {
+            justify-self: start;
+            max-width: 100%;
+            overflow: hidden;
+            color: var(--muted);
+            font-size: 11px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .message.user .message-attachment {
+            justify-self: end;
+        }
+
+        .workspace {
+            display: grid;
+            grid-template-columns: 272px minmax(320px, 0.78fr) minmax(500px, 1.22fr);
             min-height: 0;
+        }
+
+        .history-panel {
+            display: grid;
+            grid-template-rows: auto auto minmax(0, 1fr) auto;
+            min-width: 0;
+            overflow: hidden;
+            border-right: 1px solid var(--line);
+            background: #fbfcfd;
+        }
+
+        .history-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 58px;
+            padding: 0 16px;
+            border-bottom: 1px solid var(--line);
+            background: #fff;
+        }
+
+        .history-title {
+            display: grid;
+            gap: 2px;
+            min-width: 0;
+        }
+
+        .history-title strong {
+            font-size: 14px;
+        }
+
+        .history-count {
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .icon-button {
+            display: inline-grid;
+            place-items: center;
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            background: #fff;
+            color: #34404c;
+            cursor: pointer;
+            font-size: 18px;
+            line-height: 1;
+        }
+
+        .icon-button:hover {
+            background: #f1f4f6;
+        }
+
+        .icon-button:disabled {
+            cursor: not-allowed;
+            opacity: 0.4;
+        }
+
+        .history-filter {
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .history-filter select {
+            width: 100%;
+            height: 34px;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            background: #fff;
+            color: var(--text);
+            padding: 0 9px;
+            font: inherit;
+            font-size: 12px;
+        }
+
+        .history-list {
+            min-height: 0;
+            overflow-y: auto;
+        }
+
+        .history-message {
+            padding: 28px 16px;
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.6;
+            text-align: center;
+        }
+
+        .history-message.error {
+            color: var(--danger);
+        }
+
+        .history-item {
+            display: grid;
+            gap: 8px;
+            width: 100%;
+            min-height: 96px;
+            padding: 13px 16px;
+            border: 0;
+            border-bottom: 1px solid #e7ebef;
+            border-radius: 0;
+            background: transparent;
+            color: var(--text);
+            cursor: pointer;
+            text-align: left;
+        }
+
+        .history-item:hover {
+            background: #f2f6f4;
+        }
+
+        .history-item.active {
+            box-shadow: inset 3px 0 0 var(--accent);
+            background: #edf7f1;
+        }
+
+        .history-item-heading {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .history-question {
+            display: -webkit-box;
+            min-width: 0;
+            overflow: hidden;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.5;
+            overflow-wrap: anywhere;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+        }
+
+        .run-status {
+            flex: 0 0 auto;
+            padding: 3px 5px;
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            color: var(--muted);
+            background: #fff;
+            font-size: 9px;
+            font-weight: 800;
+        }
+
+        .run-status[data-status="SUCCEEDED"] {
+            border-color: #a9d6bd;
+            color: var(--accent);
+            background: #f0faf4;
+        }
+
+        .run-status[data-status="QUEUED"],
+        .run-status[data-status="RUNNING"] {
+            border-color: #efd79b;
+            color: var(--warning);
+            background: #fffbeb;
+        }
+
+        .run-status[data-status="FAILED"] {
+            border-color: #f3b7b1;
+            color: var(--danger);
+            background: #fff7f6;
+        }
+
+        .history-meta,
+        .history-target {
+            color: var(--muted);
+            font-size: 10px;
+            line-height: 1.4;
+            overflow-wrap: anywhere;
+        }
+
+        .history-target {
+            color: #46515d;
+            font-family: Consolas, "SFMono-Regular", monospace;
+        }
+
+        .history-pagination {
+            display: grid;
+            grid-template-columns: 32px minmax(0, 1fr) 32px;
+            gap: 8px;
+            align-items: center;
+            padding: 10px 16px;
+            border-top: 1px solid var(--line);
+            background: #fff;
+        }
+
+        .history-page-info {
+            color: var(--muted);
+            font-size: 11px;
+            text-align: center;
+        }
+
+        .conversation {
             overflow-y: auto;
             padding: 28px 24px;
         }
@@ -233,6 +627,344 @@
             background: #fff7f6;
         }
 
+        .message.streaming .message-body {
+            color: var(--muted);
+        }
+
+        .report-panel {
+            min-width: 0;
+            overflow-y: auto;
+            border-left: 1px solid var(--line);
+            background: var(--surface);
+        }
+
+        .report-toolbar {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 58px;
+            padding: 0 24px;
+            border-bottom: 1px solid var(--line);
+            background: rgba(255, 255, 255, 0.96);
+        }
+
+        .report-title {
+            display: grid;
+            gap: 2px;
+            min-width: 0;
+        }
+
+        .report-title strong {
+            font-size: 15px;
+        }
+
+        .report-id {
+            max-width: 360px;
+            overflow: hidden;
+            color: var(--muted);
+            font-family: Consolas, "SFMono-Regular", monospace;
+            font-size: 11px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .report-status {
+            min-width: 64px;
+            padding: 4px 7px;
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            color: var(--muted);
+            background: #f8fafb;
+            font-size: 11px;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .report-panel[data-state="loading"] .report-status {
+            border-color: #efd79b;
+            color: var(--warning);
+            background: #fffbeb;
+        }
+
+        .report-panel[data-state="ready"] .report-status {
+            border-color: #a9d6bd;
+            color: var(--accent);
+            background: #f0faf4;
+        }
+
+        .report-panel[data-state="error"] .report-status {
+            border-color: #f3b7b1;
+            color: var(--danger);
+            background: #fff7f6;
+        }
+
+        .report-empty {
+            display: grid;
+            place-items: center;
+            min-height: 46vh;
+            padding: 32px;
+            color: var(--muted);
+            text-align: center;
+        }
+
+        .report-empty[hidden],
+        .report-content[hidden] {
+            display: none;
+        }
+
+        .report-content {
+            min-width: 0;
+        }
+
+        .report-summary {
+            padding: 24px;
+        }
+
+        .report-summary h2 {
+            margin: 0 0 10px;
+            font-size: 20px;
+            line-height: 1.35;
+        }
+
+        .report-summary p {
+            margin: 0;
+            color: #34404c;
+            line-height: 1.7;
+            overflow-wrap: anywhere;
+        }
+
+        .target-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1px;
+            margin-top: 20px;
+            border: 1px solid var(--line);
+            background: var(--line);
+        }
+
+        .target-item {
+            min-width: 0;
+            padding: 12px 14px;
+            background: #f8fafb;
+        }
+
+        .target-item span {
+            display: block;
+            margin-bottom: 4px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .target-item strong {
+            display: block;
+            overflow-wrap: anywhere;
+            font-family: Consolas, "SFMono-Regular", monospace;
+            font-size: 15px;
+        }
+
+        .severity-overview {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+            margin-top: 14px;
+        }
+
+        .severity-metric {
+            min-width: 0;
+            padding: 9px 10px;
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            background: #fff;
+        }
+
+        .severity-metric span {
+            display: block;
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        .severity-metric strong {
+            display: block;
+            margin-top: 2px;
+            font-size: 18px;
+        }
+
+        .report-section {
+            border-top: 1px solid var(--line);
+        }
+
+        .section-heading {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 18px 24px 12px;
+        }
+
+        .section-heading h2 {
+            margin: 0;
+            font-size: 15px;
+        }
+
+        .section-count {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .result-list {
+            border-top: 1px solid #edf0f3;
+        }
+
+        .result-row {
+            min-width: 0;
+            padding: 16px 24px;
+            border-bottom: 1px solid #edf0f3;
+        }
+
+        .result-row:last-child {
+            border-bottom: 0;
+        }
+
+        .row-heading {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .row-heading h3 {
+            min-width: 0;
+            margin: 0;
+            font-size: 13px;
+            line-height: 1.45;
+            overflow-wrap: anywhere;
+        }
+
+        .tag {
+            flex: 0 0 auto;
+            padding: 3px 6px;
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            color: #46515d;
+            background: #f8fafb;
+            font-size: 10px;
+            font-weight: 800;
+        }
+
+        .tag[data-level="CRITICAL"] {
+            border-color: #e79b95;
+            color: #8f1d14;
+            background: #fff3f2;
+        }
+
+        .tag[data-level="HIGH"] {
+            border-color: #f0b4a1;
+            color: #9b3a1c;
+            background: #fff7f3;
+        }
+
+        .tag[data-level="MEDIUM"] {
+            border-color: #efd79b;
+            color: var(--warning);
+            background: #fffbeb;
+        }
+
+        .tag[data-level="LOW"] {
+            border-color: #a9d6bd;
+            color: var(--accent);
+            background: #f0faf4;
+        }
+
+        .result-description {
+            margin: 8px 0 0;
+            color: #46515d;
+            line-height: 1.65;
+            overflow-wrap: anywhere;
+        }
+
+        .result-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 14px;
+            margin-top: 9px;
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .result-note {
+            margin-top: 10px;
+            padding: 9px 11px;
+            border-left: 3px solid #a9d6bd;
+            background: #f6faf7;
+            color: #34404c;
+            line-height: 1.55;
+            overflow-wrap: anywhere;
+        }
+
+        .code-comparison {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .code-block {
+            min-width: 0;
+        }
+
+        .code-block span {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        .code-block pre {
+            max-height: 220px;
+            margin: 0;
+            overflow: auto;
+            padding: 10px;
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            background: #f6f8fa;
+            color: #26313b;
+            font-family: Consolas, "SFMono-Regular", monospace;
+            font-size: 11px;
+            line-height: 1.55;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        .plan-row {
+            display: grid;
+            grid-template-columns: 34px minmax(0, 1fr);
+            gap: 12px;
+        }
+
+        .plan-sequence {
+            display: grid;
+            place-items: center;
+            width: 30px;
+            height: 30px;
+            border: 1px solid #9fc8b2;
+            border-radius: 4px;
+            color: var(--accent);
+            background: #f0faf4;
+            font-weight: 800;
+        }
+
+        .empty-list {
+            padding: 16px 24px 20px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
         .composer-band {
             border-top: 1px solid var(--line);
             background: var(--surface);
@@ -293,9 +1025,49 @@
             color: var(--danger);
         }
 
+        @media (max-width: 1180px) {
+            .workspace {
+                grid-template-columns: 240px minmax(300px, 0.8fr) minmax(440px, 1.2fr);
+            }
+        }
+
+        @media (max-width: 980px) {
+            .project-context {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            .workspace {
+                display: block;
+                overflow-y: auto;
+            }
+
+            .history-panel {
+                max-height: 300px;
+                border-right: 0;
+                border-bottom: 1px solid var(--line);
+            }
+
+            .conversation {
+                min-height: 42vh;
+                overflow: visible;
+            }
+
+            .report-panel {
+                overflow: visible;
+                border-top: 1px solid var(--line);
+                border-left: 0;
+            }
+
+            .report-toolbar {
+                position: static;
+            }
+        }
+
         @media (max-width: 720px) {
             .topbar,
             .settings,
+            .project-context,
             .conversation,
             .composer-band {
                 padding-left: 14px;
@@ -310,6 +1082,36 @@
                 grid-template-columns: 1fr;
             }
 
+            .history-panel {
+                max-height: 270px;
+            }
+
+            .history-toolbar,
+            .history-filter,
+            .history-pagination,
+            .history-item {
+                padding-left: 14px;
+                padding-right: 14px;
+            }
+
+            .project-control {
+                align-items: flex-end;
+            }
+
+            .pom-actions {
+                flex-wrap: wrap;
+                justify-content: flex-end;
+            }
+
+            .pom-facts {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 9px 6px;
+            }
+
+            .pom-fact:nth-child(2) {
+                border-right: 0;
+            }
+
             .secondary {
                 width: 100%;
             }
@@ -317,6 +1119,23 @@
             .conversation {
                 padding-top: 18px;
                 padding-bottom: 18px;
+            }
+
+            .report-toolbar,
+            .report-summary,
+            .section-heading,
+            .result-row,
+            .empty-list {
+                padding-left: 14px;
+                padding-right: 14px;
+            }
+
+            .severity-overview {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .code-comparison {
+                grid-template-columns: 1fr;
             }
 
             .message {
@@ -338,36 +1157,121 @@
     <header class="topbar">
         <div class="brand">
             <strong>Spring Agent</strong>
-            <span>Diagnosis test console</span>
+            <span>Java 与 Spring 项目升级工作台</span>
         </div>
         <div id="apiStatus" class="status" data-state="busy" aria-live="polite">
             <span class="status-dot" aria-hidden="true"></span>
-            <span id="apiStatusText">Checking API</span>
+            <span id="apiStatusText">正在检查服务</span>
         </div>
     </header>
 
-    <section class="settings" aria-label="Connection settings">
+    <section class="settings" aria-label="连接设置">
         <div class="field">
-            <label for="apiUrl">API endpoint</label>
+            <label for="apiUrl">诊断接口</label>
             <input id="apiUrl" type="text" value="/diagnosis/stream" spellcheck="false">
         </div>
         <div class="field">
-            <label for="conversationId">Conversation ID</label>
+            <label for="conversationId">会话 ID</label>
             <input id="conversationId" type="text" value="00000000-0000-0000-0000-000000000101" spellcheck="false">
         </div>
-        <button id="clearButton" class="secondary" type="button">Clear</button>
+        <button id="clearButton" class="secondary" type="button">清空当前视图</button>
     </section>
 
-    <section id="conversation" class="conversation" aria-label="Conversation">
-        <div id="messages" class="messages">
-            <div id="emptyState" class="empty">No messages yet</div>
+    <section class="project-context" aria-label="项目 POM">
+        <div class="project-control">
+            <div class="project-heading">
+                <strong>项目 POM</strong>
+                <span id="pomStatus" class="pom-status" data-state="empty">可选</span>
+            </div>
+            <div class="pom-actions">
+                <label class="file-trigger" for="pomFile">选择 pom.xml</label>
+                <input
+                        id="pomFile"
+                        class="visually-hidden"
+                        type="file"
+                        accept=".xml,text/xml,application/xml"
+                >
+                <button id="pomRemoveButton" class="pom-remove" type="button" hidden>移除</button>
+            </div>
+        </div>
+        <div id="pomPreview" class="pom-preview" data-state="empty" aria-live="polite">
+            未选择项目文件
         </div>
     </section>
+
+    <div class="workspace">
+        <aside id="historyPanel" class="history-panel" aria-label="诊断历史">
+            <header class="history-toolbar">
+                <div class="history-title">
+                    <strong>诊断历史</strong>
+                    <span id="historyCount" class="history-count">正在加载</span>
+                </div>
+                <button
+                        id="refreshHistoryButton"
+                        class="icon-button"
+                        type="button"
+                        title="刷新诊断历史"
+                        aria-label="刷新诊断历史"
+                >&#8635;</button>
+            </header>
+            <div class="history-filter">
+                <label class="visually-hidden" for="historyStatus">诊断状态</label>
+                <select id="historyStatus">
+                    <option value="">全部状态</option>
+                    <option value="SUCCEEDED">已完成</option>
+                    <option value="RUNNING">运行中</option>
+                    <option value="QUEUED">排队中</option>
+                    <option value="FAILED">失败</option>
+                    <option value="CANCELLED">已取消</option>
+                </select>
+            </div>
+            <div id="historyList" class="history-list" aria-live="polite">
+                <div class="history-message">正在加载诊断历史</div>
+            </div>
+            <footer class="history-pagination">
+                <button
+                        id="historyPreviousButton"
+                        class="icon-button"
+                        type="button"
+                        title="上一页"
+                        aria-label="上一页"
+                        disabled
+                >&lsaquo;</button>
+                <span id="historyPageInfo" class="history-page-info">第 1 页</span>
+                <button
+                        id="historyNextButton"
+                        class="icon-button"
+                        type="button"
+                        title="下一页"
+                        aria-label="下一页"
+                        disabled
+                >&rsaquo;</button>
+            </footer>
+        </aside>
+
+        <section id="conversation" class="conversation" aria-label="当前对话">
+            <div id="messages" class="messages">
+                <div id="emptyState" class="empty">暂无对话记录</div>
+            </div>
+        </section>
+
+        <aside id="reportPanel" class="report-panel" data-state="empty" aria-label="诊断结果">
+            <header class="report-toolbar">
+                <div class="report-title">
+                    <strong>诊断结果</strong>
+                    <span id="reportId" class="report-id">尚未生成</span>
+                </div>
+                <span id="reportStatus" class="report-status">等待中</span>
+            </header>
+            <div id="reportEmpty" class="report-empty">暂无诊断结果</div>
+            <div id="reportContent" class="report-content" hidden></div>
+        </aside>
+    </div>
 
     <footer class="composer-band">
         <form id="composer" class="composer">
-            <textarea id="messageInput" aria-label="Message" placeholder="Enter a Java or Spring upgrade question" required></textarea>
-            <button id="sendButton" class="primary" type="submit">Send</button>
+            <textarea id="messageInput" aria-label="诊断问题" placeholder="请输入 Java 或 Spring 项目升级问题" required></textarea>
+            <button id="sendButton" class="primary" type="submit">发送</button>
         </form>
         <div id="requestState" class="request-state" aria-live="polite"></div>
     </footer>
@@ -380,14 +1284,39 @@
     const messageInput = document.getElementById("messageInput");
     const sendButton = document.getElementById("sendButton");
     const clearButton = document.getElementById("clearButton");
+    const pomFile = document.getElementById("pomFile");
+    const pomRemoveButton = document.getElementById("pomRemoveButton");
+    const pomStatus = document.getElementById("pomStatus");
+    const pomPreview = document.getElementById("pomPreview");
+    const historyPanel = document.getElementById("historyPanel");
+    const historyCount = document.getElementById("historyCount");
+    const historyStatus = document.getElementById("historyStatus");
+    const historyList = document.getElementById("historyList");
+    const refreshHistoryButton = document.getElementById("refreshHistoryButton");
+    const historyPreviousButton = document.getElementById("historyPreviousButton");
+    const historyNextButton = document.getElementById("historyNextButton");
+    const historyPageInfo = document.getElementById("historyPageInfo");
     const messages = document.getElementById("messages");
-    const emptyState = document.getElementById("emptyState");
     const requestState = document.getElementById("requestState");
     const conversation = document.getElementById("conversation");
     const apiStatus = document.getElementById("apiStatus");
     const apiStatusText = document.getElementById("apiStatusText");
+    const reportPanel = document.getElementById("reportPanel");
+    const reportId = document.getElementById("reportId");
+    const reportStatus = document.getElementById("reportStatus");
+    const reportEmpty = document.getElementById("reportEmpty");
+    const reportContent = document.getElementById("reportContent");
 
     let activeRequest = null;
+    let activeDiagnosisId = null;
+    let pomParseRequest = null;
+    let selectedPomFile = null;
+    let parsedProjectInput = null;
+    let historyPage = 1;
+    let historyTotalPages = 0;
+    let historyLoading = false;
+
+    const HISTORY_PAGE_SIZE = 10;
 
     const savedConversationId = localStorage.getItem("spring-agent.conversationId");
     if (savedConversationId) conversationId.value = savedConversationId;
@@ -402,8 +1331,488 @@
         requestState.classList.toggle("error", isError);
     }
 
-    function addMessage(role, content = "") {
-        emptyState?.remove();
+    function setReportState(state, text) {
+        reportPanel.dataset.state = state;
+        reportStatus.textContent = text;
+        reportPanel.setAttribute("aria-busy", String(state === "loading"));
+    }
+
+    function resetReport(message = "暂无诊断结果") {
+        reportContent.replaceChildren();
+        reportContent.hidden = true;
+        reportEmpty.hidden = false;
+        reportEmpty.textContent = message;
+        reportId.textContent = activeDiagnosisId || "尚未生成";
+        setReportState("empty", "等待中");
+    }
+
+    function showReportLoading(message = "正在生成诊断结果") {
+        reportContent.hidden = true;
+        reportEmpty.hidden = false;
+        reportEmpty.textContent = message;
+        reportId.textContent = activeDiagnosisId || "正在建立诊断任务";
+        setReportState("loading", "处理中");
+    }
+
+    function showReportError(message) {
+        reportContent.hidden = true;
+        reportEmpty.hidden = false;
+        reportEmpty.textContent = message || "诊断结果加载失败";
+        reportId.textContent = activeDiagnosisId || "未生成诊断 ID";
+        setReportState("error", "失败");
+    }
+
+    function element(tagName, className, text) {
+        const node = document.createElement(tagName);
+        if (className) node.className = className;
+        if (text !== undefined && text !== null) node.textContent = String(text);
+        return node;
+    }
+
+    function hasText(value) {
+        return typeof value === "string" && value.trim().length > 0;
+    }
+
+    function displayValue(value, fallback = "未提供") {
+        return value === undefined || value === null || value === ""
+            ? fallback
+            : String(value);
+    }
+
+    const DISPLAY_LABELS = {
+        QUEUED: "排队中",
+        RUNNING: "运行中",
+        SUCCEEDED: "已完成",
+        FAILED: "失败",
+        CANCELLED: "已取消",
+        CRITICAL: "严重",
+        HIGH: "高",
+        MEDIUM: "中",
+        LOW: "低",
+        DEPENDENCY: "依赖",
+        BUILD: "构建",
+        CODE: "代码",
+        CONFIGURATION: "配置",
+        DATABASE: "数据库",
+        TEST: "测试",
+        DEPLOYMENT: "部署",
+        PREPARATION: "准备",
+        SOURCE_CODE: "源码",
+        DATA: "数据",
+        TESTING: "测试",
+        ROLLBACK: "回滚",
+        PROPOSED: "待处理",
+        APPLIED: "已应用",
+        VERIFIED: "已验证",
+        SKIPPED: "已跳过",
+        PENDING: "待执行",
+        IN_PROGRESS: "执行中",
+        COMPLETED: "已完成"
+    };
+
+    function displayLabel(value, fallback = "未提供") {
+        if (value === undefined || value === null || value === "") {
+            return fallback;
+        }
+        return DISPLAY_LABELS[value] || String(value);
+    }
+
+    function setPomStatus(state, text) {
+        pomStatus.dataset.state = state;
+        pomStatus.textContent = text;
+        pomPreview.dataset.state = state;
+    }
+
+    function formatFileSize(size) {
+        if (size < 1024) return `${size} B`;
+        return `${(size / 1024).toFixed(size < 10240 ? 1 : 0)} KB`;
+    }
+
+    function projectCoordinate(project) {
+        const coordinate = [project.groupId, project.artifactId]
+            .filter(hasText)
+            .join(":");
+        return hasText(project.version)
+            ? `${coordinate || "未提供坐标"}:${project.version}`
+            : coordinate || "未提供坐标";
+    }
+
+    function createPomFact(label, value) {
+        const fact = element("div", "pom-fact");
+        fact.append(
+            element("span", "", label),
+            element("strong", "", displayValue(value))
+        );
+        return fact;
+    }
+
+    function showPomParsing(file) {
+        setPomStatus("parsing", "解析中");
+        pomRemoveButton.hidden = false;
+        pomPreview.replaceChildren();
+        const header = element("div", "pom-preview-header");
+        header.append(
+            element("strong", "", file.name),
+            element("span", "", formatFileSize(file.size))
+        );
+        pomPreview.append(
+            header,
+            element("span", "", "正在读取项目配置…")
+        );
+    }
+
+    function renderPomPreview(file, project) {
+        setPomStatus("ready", "已解析");
+        pomPreview.replaceChildren();
+
+        const header = element("div", "pom-preview-header");
+        header.append(
+            element("strong", "", file.name),
+            element("span", "", formatFileSize(file.size))
+        );
+
+        const facts = element("div", "pom-facts");
+        facts.append(
+            createPomFact("Project", projectCoordinate(project)),
+            createPomFact("Java", project.javaVersion),
+            createPomFact("Spring Boot", project.springBootVersion),
+            createPomFact(
+                "Dependencies",
+                Array.isArray(project.dependencies)
+                    ? project.dependencies.length
+                    : 0
+            )
+        );
+        pomPreview.append(header, facts);
+
+        if (Array.isArray(project.warnings) && project.warnings.length > 0) {
+            pomPreview.appendChild(element(
+                "div",
+                "pom-warning",
+                `解析警告：${project.warnings.join("；")}`
+            ));
+        }
+    }
+
+    function showPomError(file, message) {
+        selectedPomFile = null;
+        parsedProjectInput = null;
+        pomFile.value = "";
+        pomRemoveButton.hidden = false;
+        setPomStatus("error", "解析失败");
+        pomPreview.replaceChildren();
+
+        const header = element("div", "pom-preview-header");
+        header.append(
+            element("strong", "", file.name),
+            element("span", "", formatFileSize(file.size))
+        );
+        pomPreview.append(header, element("span", "", message));
+    }
+
+    function resetPom() {
+        pomParseRequest?.abort();
+        pomParseRequest = null;
+        selectedPomFile = null;
+        parsedProjectInput = null;
+        pomFile.value = "";
+        pomFile.disabled = false;
+        pomRemoveButton.disabled = false;
+        pomRemoveButton.hidden = true;
+        sendButton.disabled = false;
+        setPomStatus("empty", "可选");
+        pomPreview.replaceChildren();
+        pomPreview.textContent = "未选择项目文件";
+    }
+
+    function projectArtifactEndpoint() {
+        const endpoint = new URL(apiUrl.value.trim(), window.location.href);
+        endpoint.pathname = "/project-artifacts/pom";
+        endpoint.search = "";
+        return endpoint;
+    }
+
+    function preparedDiagnosisEndpoint() {
+        const endpoint = new URL(apiUrl.value.trim(), window.location.href);
+        if (/\/(?:stream|prepare)\/?$/.test(endpoint.pathname)) {
+            endpoint.pathname = endpoint.pathname.replace(
+                /\/(?:stream|prepare)\/?$/,
+                "/prepare"
+            );
+        } else {
+            endpoint.pathname = "/diagnosis/prepare";
+        }
+        endpoint.search = "";
+        return endpoint;
+    }
+
+    async function parsePom(file) {
+        if (file.size === 0) {
+            showPomError(file, "POM 文件不能为空");
+            return;
+        }
+        if (file.size > 1024 * 1024) {
+            showPomError(file, "POM XML 不能超过 1 MB");
+            return;
+        }
+
+        pomParseRequest?.abort();
+        const controller = new AbortController();
+        pomParseRequest = controller;
+        showPomParsing(file);
+        sendButton.disabled = true;
+
+        const body = new FormData();
+        body.append("file", file, file.name);
+
+        try {
+            const response = await fetch(projectArtifactEndpoint(), {
+                method: "POST",
+                headers: { "Accept": "application/json" },
+                body,
+                signal: controller.signal
+            });
+            if (!response.ok) throw await createResponseError(response);
+
+            const envelope = await response.json();
+            if (!envelope || !envelope.data) {
+                throw new Error("POM 解析结果为空");
+            }
+            if (pomParseRequest !== controller) return;
+
+            selectedPomFile = file;
+            parsedProjectInput = envelope.data;
+            renderPomPreview(file, parsedProjectInput);
+        } catch (error) {
+            if (error.name !== "AbortError" && pomParseRequest === controller) {
+                showPomError(file, error.message);
+            }
+        } finally {
+            if (pomParseRequest === controller) {
+                pomParseRequest = null;
+                sendButton.disabled = false;
+            }
+        }
+    }
+
+    function appendMetadata(container, entries) {
+        const metadata = element("div", "result-meta");
+        for (const [label, value] of entries) {
+            if (value === undefined || value === null || value === "") continue;
+            metadata.appendChild(element("span", "", `${label}：${value}`));
+        }
+        if (metadata.childElementCount > 0) container.appendChild(metadata);
+    }
+
+    function createTag(text, level) {
+        const tag = element("span", "tag", displayLabel(text));
+        if (level) tag.dataset.level = level;
+        return tag;
+    }
+
+    function createNote(text) {
+        return element("div", "result-note", text);
+    }
+
+    function createReportSection(title, items, emptyText, renderer) {
+        const section = element("section", "report-section");
+        const heading = element("div", "section-heading");
+        heading.append(
+            element("h2", "", title),
+            element("span", "section-count", `${items.length} 项`)
+        );
+        section.appendChild(heading);
+
+        if (items.length === 0) {
+            section.appendChild(element("div", "empty-list", emptyText));
+            return section;
+        }
+
+        const list = element("div", "result-list");
+        for (const item of items) list.appendChild(renderer(item));
+        section.appendChild(list);
+        return section;
+    }
+
+    function renderRisk(risk) {
+        const row = element("article", "result-row");
+        const heading = element("div", "row-heading");
+        heading.append(
+            element("h3", "", displayValue(risk.title, "未命名风险")),
+            createTag(risk.severity, risk.severity)
+        );
+        row.appendChild(heading);
+        if (hasText(risk.description)) {
+            row.appendChild(element("p", "result-description", risk.description));
+        }
+        appendMetadata(row, [
+            ["类别", displayLabel(risk.category)],
+            ["组件", risk.affectedComponent],
+            ["可能性", risk.likelihood],
+            ["影响", risk.impact]
+        ]);
+        if (hasText(risk.mitigation)) {
+            row.appendChild(createNote(`缓解措施：${risk.mitigation}`));
+        }
+        return row;
+    }
+
+    function renderCompatibilityIssue(issue) {
+        const row = element("article", "result-row");
+        const heading = element("div", "row-heading");
+        heading.append(
+            element("h3", "", displayValue(issue.component, "未知组件")),
+            createTag(issue.severity, issue.severity)
+        );
+        row.appendChild(heading);
+        appendMetadata(row, [
+            ["问题类型", displayLabel(issue.issueType)],
+            ["当前版本", issue.currentVersion],
+            ["目标版本", issue.targetVersion],
+            ["已确认", issue.confirmed ? "是" : "否"]
+        ]);
+        if (hasText(issue.symptom)) {
+            row.appendChild(element("p", "result-description", issue.symptom));
+        }
+        if (hasText(issue.rootCause)) {
+            row.appendChild(createNote(`根因：${issue.rootCause}`));
+        }
+        return row;
+    }
+
+    function createCodeBlock(label, content) {
+        const wrapper = element("div", "code-block");
+        wrapper.append(
+            element("span", "", label),
+            element("pre", "", content)
+        );
+        return wrapper;
+    }
+
+    function renderSuggestion(suggestion) {
+        const row = element("article", "result-row");
+        const heading = element("div", "row-heading");
+        heading.append(
+            element("h3", "", displayValue(suggestion.title, "未命名建议")),
+            createTag(suggestion.priority)
+        );
+        row.appendChild(heading);
+        appendMetadata(row, [
+            ["类型", displayLabel(suggestion.actionType)],
+            ["文件", suggestion.filePath],
+            ["状态", displayLabel(suggestion.status)]
+        ]);
+        if (hasText(suggestion.description)) {
+            row.appendChild(element("p", "result-description", suggestion.description));
+        }
+        if (hasText(suggestion.beforeContent) || hasText(suggestion.afterContent)) {
+            const comparison = element("div", "code-comparison");
+            if (hasText(suggestion.beforeContent)) {
+                comparison.appendChild(createCodeBlock("修改前", suggestion.beforeContent));
+            }
+            if (hasText(suggestion.afterContent)) {
+                comparison.appendChild(createCodeBlock("修改后", suggestion.afterContent));
+            }
+            row.appendChild(comparison);
+        }
+        if (hasText(suggestion.verification)) {
+            row.appendChild(createNote(`验证方式：${suggestion.verification}`));
+        }
+        return row;
+    }
+
+    function renderPlanStep(step) {
+        const row = element("article", "result-row plan-row");
+        row.appendChild(element("div", "plan-sequence", displayValue(step.sequenceNo, "-")));
+
+        const body = element("div", "");
+        const heading = element("div", "row-heading");
+        heading.append(
+            element("h3", "", displayValue(step.title, "未命名步骤")),
+            createTag(step.phase)
+        );
+        body.appendChild(heading);
+        if (hasText(step.description)) {
+            body.appendChild(element("p", "result-description", step.description));
+        }
+        appendMetadata(body, [
+            ["状态", displayLabel(step.status)],
+            ["预计工作量", step.estimatedEffort]
+        ]);
+        if (Array.isArray(step.prerequisites) && step.prerequisites.length > 0) {
+            body.appendChild(createNote(`前置条件：${step.prerequisites.join("；")}`));
+        }
+        if (hasText(step.verification)) {
+            body.appendChild(createNote(`验证方式：${step.verification}`));
+        }
+        if (hasText(step.rollbackAction)) {
+            body.appendChild(createNote(`回滚方式：${step.rollbackAction}`));
+        }
+        row.appendChild(body);
+        return row;
+    }
+
+    function renderDiagnosisResult(result) {
+        const risks = Array.isArray(result.risks) ? result.risks : [];
+        const compatibilityIssues = Array.isArray(result.compatibilityIssues)
+            ? result.compatibilityIssues
+            : [];
+        const suggestions = Array.isArray(result.suggestions) ? result.suggestions : [];
+        const planSteps = Array.isArray(result.planSteps) ? result.planSteps : [];
+
+        const summary = element("section", "report-summary");
+        summary.append(
+            element("h2", "", "诊断摘要"),
+            element("p", "", displayValue(result.summary, "未提供诊断摘要"))
+        );
+
+        const target = element("div", "target-grid");
+        const javaTarget = element("div", "target-item");
+        javaTarget.append(
+            element("span", "", "目标 Java"),
+            element("strong", "", displayValue(result.target?.javaVersion))
+        );
+        const springTarget = element("div", "target-item");
+        springTarget.append(
+            element("span", "", "目标 Spring Boot"),
+            element("strong", "", displayValue(result.target?.springBootVersion))
+        );
+        target.append(javaTarget, springTarget);
+        summary.appendChild(target);
+
+        const levels = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
+        const overview = element("div", "severity-overview");
+        for (const level of levels) {
+            const metric = element("div", "severity-metric");
+            metric.append(
+                element("span", "", level),
+                element("strong", "", risks.filter(risk => risk.severity === level).length)
+            );
+            overview.appendChild(metric);
+        }
+        summary.appendChild(overview);
+
+        reportContent.replaceChildren(
+            summary,
+            createReportSection("风险", risks, "未发现风险", renderRisk),
+            createReportSection(
+                "兼容性问题",
+                compatibilityIssues,
+                "未发现兼容性问题",
+                renderCompatibilityIssue
+            ),
+            createReportSection("修改建议", suggestions, "暂无修改建议", renderSuggestion),
+            createReportSection("升级步骤", planSteps, "暂无升级步骤", renderPlanStep)
+        );
+        activeDiagnosisId = result.diagnosisId || activeDiagnosisId;
+        reportId.textContent = activeDiagnosisId || "未知诊断 ID";
+        reportEmpty.hidden = true;
+        reportContent.hidden = false;
+        setReportState("ready", "已完成");
+    }
+
+    function addMessage(role, content = "", attachmentName = "") {
+        document.getElementById("emptyState")?.remove();
         const wrapper = document.createElement("article");
         wrapper.className = `message ${role}`;
 
@@ -416,9 +1825,27 @@
         body.textContent = content;
 
         wrapper.append(meta, body);
+        if (hasText(attachmentName)) {
+            wrapper.appendChild(element(
+                "div",
+                "message-attachment",
+                `附件：${attachmentName}`
+            ));
+        }
         messages.appendChild(wrapper);
         conversation.scrollTop = conversation.scrollHeight;
         return body;
+    }
+
+    function updateLastAssistantMessage(content, isError = false) {
+        const assistantMessages = messages.querySelectorAll(".message.assistant");
+        const message = assistantMessages.item(assistantMessages.length - 1);
+        if (!message) return;
+
+        message.classList.remove("streaming");
+        message.classList.toggle("error", isError);
+        const body = message.querySelector(".message-body");
+        if (body) body.textContent = content;
     }
 
     function parseEventBlock(block) {
@@ -469,26 +1896,68 @@
         }
     }
 
+    async function fetchDiagnosisResult(diagnosisId) {
+        const endpoint = new URL(apiUrl.value.trim(), window.location.href);
+        const diagnosisBase = endpoint.pathname.replace(
+            /\/(?:stream|prepare)\/?$/,
+            ""
+        );
+        endpoint.pathname = `${diagnosisBase}/runs/${encodeURIComponent(diagnosisId)}/result`;
+        endpoint.search = "";
+
+        const response = await fetch(endpoint, {
+            headers: { "Accept": "application/json" },
+            cache: "no-store",
+            signal: activeRequest?.signal
+        });
+        if (!response.ok) throw await createResponseError(response);
+
+        const envelope = await response.json();
+        if (!envelope || !envelope.data) {
+            throw new Error("Diagnosis result response is empty");
+        }
+        return envelope.data;
+    }
+
     async function streamDiagnosis(question) {
         const id = conversationId.value.trim();
         if (!id) throw new Error("Conversation ID is required");
 
+        activeDiagnosisId = null;
+        showReportLoading();
         localStorage.setItem("spring-agent.conversationId", id);
         activeRequest = new AbortController();
         sendButton.dataset.mode = "stop";
         sendButton.textContent = "Stop";
+        pomFile.disabled = true;
+        pomRemoveButton.disabled = true;
         setApiStatus("busy", "Streaming");
         setRequestState("Waiting for response");
 
-        const assistantBody = addMessage("assistant");
-        const response = await fetch(apiUrl.value.trim(), {
+        const assistantBody = addMessage("assistant", "正在生成结构化诊断结果…");
+        const assistantMessage = assistantBody.closest(".message");
+        assistantMessage.classList.add("streaming");
+        let endpoint = apiUrl.value.trim();
+        let headers = {
+            "Content-Type": "application/json",
+            "Accept": "text/event-stream, application/json"
+        };
+        let body = JSON.stringify({ conversationId: id, input: question });
+
+        if (selectedPomFile) {
+            endpoint = preparedDiagnosisEndpoint();
+            headers = { "Accept": "text/event-stream, application/json" };
+            body = new FormData();
+            body.append("conversationId", id);
+            body.append("input", question);
+            body.append("file", selectedPomFile, selectedPomFile.name);
+        }
+
+        const response = await fetch(endpoint, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "text/event-stream, application/json"
-            },
-            body: JSON.stringify({ conversationId: id, input: question }),
-            signal: activeRequest.signal,
+            headers,
+            body,
+            signal: activeRequest.signal
         });
 
         if (!response.ok) {
@@ -499,6 +1968,7 @@
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
+        let completed = false;
 
         while (true) {
             const { value, done } = await reader.read();
@@ -510,20 +1980,36 @@
                 const event = parseEventBlock(block);
                 const envelope = parseEventData(event);
                 if (event.eventName === "meta") {
+                    activeDiagnosisId = envelope.data.diagnosisId;
+                    reportId.textContent = activeDiagnosisId;
                     setRequestState("Connected");
                 } else if (event.eventName === "chunk") {
-                    assistantBody.textContent += envelope.data.content;
-                    conversation.scrollTop = conversation.scrollHeight;
+                    // 模型输出是结构化 JSON，流式阶段只展示运行状态。
+                    void envelope.data.content;
                 } else if (event.eventName === "error") {
-                    assistantBody.closest(".message").classList.add("error");
+                    assistantMessage.classList.remove("streaming");
+                    assistantMessage.classList.add("error");
                     const message = envelope.data.message || "Diagnosis failed";
                     assistantBody.textContent = message;
                     throw new Error(message);
                 } else if (event.eventName === "done") {
+                    if (!activeDiagnosisId) {
+                        throw new Error("Diagnosis ID is missing from the stream");
+                    }
+                    setRequestState("Loading structured result");
+                    showReportLoading("正在加载结构化诊断结果");
+                    const result = await fetchDiagnosisResult(activeDiagnosisId);
+                    renderDiagnosisResult(result);
+                    assistantMessage.classList.remove("streaming");
+                    assistantBody.textContent = result.summary;
                     setRequestState("Response complete");
+                    completed = true;
                 }
             }
-            if (done) break;
+            if (done) {
+                if (!completed) throw new Error("Diagnosis stream ended before completion");
+                break;
+            }
         }
     }
 
@@ -536,7 +2022,7 @@
 
         const question = messageInput.value.trim();
         if (!question) return;
-        addMessage("user", question);
+        addMessage("user", question, selectedPomFile?.name);
         messageInput.value = "";
 
         try {
@@ -545,14 +2031,20 @@
         } catch (error) {
             if (error.name === "AbortError") {
                 setRequestState("Request stopped");
+                updateLastAssistantMessage("诊断已停止");
+                resetReport("诊断已停止");
             } else {
                 setRequestState(error.message, true);
                 setApiStatus("offline", "Request failed");
+                updateLastAssistantMessage(error.message, true);
+                showReportError(error.message);
             }
         } finally {
             activeRequest = null;
             sendButton.dataset.mode = "send";
             sendButton.textContent = "Send";
+            pomFile.disabled = false;
+            pomRemoveButton.disabled = false;
             messageInput.focus();
         }
     });
@@ -565,6 +2057,8 @@
     });
 
     clearButton.addEventListener("click", () => {
+        activeRequest?.abort();
+        activeDiagnosisId = null;
         messages.replaceChildren();
         const empty = document.createElement("div");
         empty.id = "emptyState";
@@ -572,7 +2066,16 @@
         empty.textContent = "No messages yet";
         messages.appendChild(empty);
         setRequestState("");
+        resetReport();
+        resetPom();
     });
+
+    pomFile.addEventListener("change", () => {
+        const [file] = pomFile.files;
+        if (file) parsePom(file);
+    });
+
+    pomRemoveButton.addEventListener("click", resetPom);
 
     apiUrl.addEventListener("change", checkApi);
     checkApi();
