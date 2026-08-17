@@ -21,7 +21,7 @@ public class RagTests {
     KnowledgeIngestionService knowledgeIngestionService;
     @Test
     public void testKnowledge(){
-        knowledgeIngestionService.ingestSpringBoot30Guide();
+        knowledgeIngestionService.ingestAll();
         List<Document> spring = knowledgeRetrievalService.searchSpringBoot30("How to migrate from javax to jakarta in Spring Boot 3.0");
         for (Document d : spring){
             System.out.println(d.getText());
