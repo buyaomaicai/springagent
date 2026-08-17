@@ -259,6 +259,27 @@ web_sources:
   Postgres 默认分词对中文无效（无空格分词），详见"设计评审发现·缺陷 3"
 - **架构决策（待讨论）**：扩展 Spring AI 默认 `vector_store` 表（加关键词列与索引），还是自建知识表？倾向扩展 Spring AI 表——能继续用 VectorStore 抽象做相似度检索，关键词走原生 SQL，服务层融合。零新中间件是面试加分点
 
+### 事实核对：Spring AI PgVectorStore 真实 schema（已反编译验证，1.1.8）
+```sql
+-- Spring AI 启动时自动执行（initialize-schema: true）
+CREATE TABLE IF NOT EXISTS vector_store (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    content text,
+    metadata json,              -- 注意是 json 不是 jsonb
+    embedding vector(1024)
+);
+CREATE INDEX IF NOT EXISTS ... ON vector_store USING HNSW (embedding vector_cosine_ops);
+```
+**对决策 #6 的结论（可行，但有实现时机坑）**：
+1. ✅ **加列不影响 Spring AI**——它的 INSERT/SELECT 只涉及 id/content/metadata/embedding 四列
+2. ⚠️ **加列不能放 docker init 脚本**——001/002 在 postgres 首次启动时执行，此时 vector_store
+   还没创建（应用尚未启动，表由 Spring AI 在启动时建）。必须在**应用启动后**增强 schema：
+   `@Component VectorStoreSchemaEnhancer`，`@PostConstruct` 执行
+   `ALTER TABLE vector_store ADD COLUMN IF NOT EXISTS ...` + `CREATE INDEX ... USING GIN (content gin_trgm_ops)`
+3. ✅ 可用 `spring.ai.vectorstore.pgvector.table-name` 自定义表名（如不需要完全自建则保持默认）
+4. ⚠️ `remove-existing-vector-store-table` 是危险开关（默认 false），千万别开
+
+
 ### RRF 融合（为什么用排名不用分数）
 - 公式：`score(d) = Σ 1/(k + rank_i(d))`，k 常取 60
 - 理由：两通道分数分布不同（余弦 0~1 vs ts_rank 无界），归一化相加需要调权重；RRF 只看排名，**无需调参、天然鲁棒**
