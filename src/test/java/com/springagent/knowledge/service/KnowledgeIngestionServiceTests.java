@@ -8,6 +8,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.springagent.knowledge.chunking.ChunkingStrategy;
+import com.springagent.knowledge.chunking.FixedSizeChunkingStrategy;
+import com.springagent.knowledge.chunking.KnowledgeChunkingProperties;
 import com.springagent.knowledge.parser.AsciidocDocumentParser;
 import com.springagent.knowledge.source.SourceDefinition;
 import com.springagent.knowledge.source.SourceDocument;
@@ -61,7 +64,9 @@ class KnowledgeIngestionServiceTests {
         KnowledgeIngestionService service = new KnowledgeIngestionService(
                 sourceRegistry,
                 vectorStore,
-                List.of(new AsciidocDocumentParser())
+                List.of(new AsciidocDocumentParser()),
+                List.of(fixedStrategy()),
+                fixedProperties()
         );
 
         int count = service.ingestAll();
@@ -106,7 +111,9 @@ class KnowledgeIngestionServiceTests {
         KnowledgeIngestionService service = new KnowledgeIngestionService(
                 sourceRegistry,
                 vectorStore,
-                List.of(new AsciidocDocumentParser())
+                List.of(new AsciidocDocumentParser()),
+                List.of(fixedStrategy()),
+                fixedProperties()
         );
 
         int count = service.ingestAll();
@@ -114,6 +121,19 @@ class KnowledgeIngestionServiceTests {
         assertEquals(0, count);
         verify(vectorStore, never()).delete(any(Filter.Expression.class));
         verify(vectorStore, never()).add(any());
+    }
+
+    private ChunkingStrategy fixedStrategy() {
+        return new FixedSizeChunkingStrategy(fixedProperties());
+    }
+
+    private KnowledgeChunkingProperties fixedProperties() {
+        KnowledgeChunkingProperties properties =
+                new KnowledgeChunkingProperties();
+        properties.setStrategy("FIXED");
+        properties.setChunkSize(200);
+        properties.setOverlap(20);
+        return properties;
     }
 
     private String longAsciidocContent() {

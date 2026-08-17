@@ -54,3 +54,11 @@ mybatis-plus:
   type-handlers-package: com.springagent.common.persistence
   configuration:
     map-underscore-to-camel-case: true
+
+knowledge:
+  chunking:
+    # 分块策略：FIXED | PARAGRAPH | HEADING_AWARE
+    strategy: HEADING_AWARE
+    # chunk 目标大小（字符）与滑动窗口重叠量（字符，必须小于 chunk-size）
+    chunk-size: 500
+    overlap: 50
