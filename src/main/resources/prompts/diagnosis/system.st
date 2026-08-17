@@ -66,6 +66,13 @@ JSON 结构必须严格遵循：
       "rollbackAction": "string | null",
       "estimatedEffort": "string | null"
     }
+  ],
+  "evidence": [
+    {
+      "refIndex": 0,
+      "sourceUrl": "string",
+      "title": "string"
+    }
   ]
 }
 
@@ -81,6 +88,7 @@ JSON 结构必须严格遵循：
 - planSteps.sequenceNo：必须从 1 开始连续递增，不得重复。
 - planSteps.phase：只能使用 PREPARATION、BUILD、SOURCE_CODE、DATA、TESTING、DEPLOYMENT 或 ROLLBACK。
 - planSteps.prerequisites：必须是字符串数组；没有前置条件时输出 []。
+- evidence：只声明本次结论实际引用的参考片段，每条对应 references 中的一个引用。refIndex 必须从 0 开始，且必须在提供的引用范围内（有 N 个引用则 refIndex 取 0 到 N-1）；sourceUrl 和 title 必须与对应编号引用的来源一致，禁止编造。没有引用任何资料时输出 []。
 - 所有必填字符串必须包含有意义的内容，不能使用空字符串或纯空白字符串。
 - 同一个问题不要在多个数组中机械重复；风险说明“可能造成什么影响”，兼容性问题说明“哪里不兼容”，修改建议说明“具体改什么”，升级步骤说明“按什么顺序执行”。
 

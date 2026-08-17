@@ -24,14 +24,17 @@ import com.springagent.diagnosis.domain.dto.response.DiagnosisRunSummaryResponse
 import com.springagent.diagnosis.entity.CompatibilityIssue;
 import com.springagent.diagnosis.entity.DiagnosisRisk;
 import com.springagent.diagnosis.entity.DiagnosisRun;
+import com.springagent.diagnosis.entity.KnowledgeEvidence;
 import com.springagent.diagnosis.entity.ModificationSuggestion;
 import com.springagent.diagnosis.entity.UpgradePlanStep;
 import com.springagent.diagnosis.mapper.CompatibilityIssueMapper;
 import com.springagent.diagnosis.mapper.DiagnosisRiskMapper;
 import com.springagent.diagnosis.mapper.DiagnosisRunMapper;
+import com.springagent.diagnosis.mapper.KnowledgeEvidenceMapper;
 import com.springagent.diagnosis.mapper.ModificationSuggestionMapper;
 import com.springagent.diagnosis.mapper.UpgradePlanStepMapper;
 import com.springagent.diagnosis.model.DiagnosisRunStatus;
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -71,6 +74,7 @@ class DiagnosisResultQueryServiceTests {
         TableInfoHelper.initTableInfo(assistant, CompatibilityIssue.class);
         TableInfoHelper.initTableInfo(assistant, ModificationSuggestion.class);
         TableInfoHelper.initTableInfo(assistant, UpgradePlanStep.class);
+        TableInfoHelper.initTableInfo(assistant, KnowledgeEvidence.class);
     }
 
     @Mock
@@ -88,6 +92,9 @@ class DiagnosisResultQueryServiceTests {
     @Mock
     private UpgradePlanStepMapper upgradePlanStepMapper;
 
+    @Mock
+    private KnowledgeEvidenceMapper knowledgeEvidenceMapper;
+
     private DiagnosisResultQueryService queryService;
 
     @BeforeEach
@@ -98,6 +105,7 @@ class DiagnosisResultQueryServiceTests {
                 compatibilityIssueMapper,
                 modificationSuggestionMapper,
                 upgradePlanStepMapper,
+                knowledgeEvidenceMapper,
                 OBJECT_MAPPER
         );
     }
@@ -263,6 +271,18 @@ class DiagnosisResultQueryServiceTests {
                 .setRollbackAction("Restore old parent")
                 .setEstimatedEffort("1 hour")
                 .setStatus("PENDING");
+        KnowledgeEvidence evidence = new KnowledgeEvidence()
+                .setDiagnosisId(DIAGNOSIS_ID)
+                .setSourceType("MIGRATION_GUIDE")
+                .setSourceUrl(
+                        "https://github.com/spring-projects/spring-boot/wiki/"
+                                + "Spring-Boot-3.0-Migration-Guide"
+                )
+                .setTitle("Spring-Boot-3.0-Migration-Guide")
+                .setComponent("spring-boot")
+                .setVersionRange("3.0")
+                .setExcerpt("Spring Boot 3.0 requires Java 17")
+                .setRelevance(new BigDecimal("0.8500"));
 
         when(diagnosisRunMapper.selectById(DIAGNOSIS_ID)).thenReturn(run);
         when(diagnosisRiskMapper.selectList(any()))
@@ -273,6 +293,8 @@ class DiagnosisResultQueryServiceTests {
                 .thenReturn(List.of(suggestion));
         when(upgradePlanStepMapper.selectList(any()))
                 .thenReturn(List.of(planStep));
+        when(knowledgeEvidenceMapper.selectList(any()))
+                .thenReturn(List.of(evidence));
 
         DiagnosisResultResponse result = queryService.getResult(DIAGNOSIS_ID);
 
@@ -293,6 +315,18 @@ class DiagnosisResultQueryServiceTests {
                 List.of("backup project"),
                 result.planSteps().get(0).prerequisites()
         );
+        assertEquals(1, result.evidence().size());
+        assertEquals("MIGRATION_GUIDE", result.evidence().get(0).sourceType());
+        assertEquals("spring-boot", result.evidence().get(0).component());
+        assertEquals("3.0", result.evidence().get(0).versionRange());
+        assertEquals(
+                "https://github.com/spring-projects/spring-boot/wiki/"
+                        + "Spring-Boot-3.0-Migration-Guide",
+                result.evidence().get(0).sourceUrl()
+        );
+        assertEquals(0, new BigDecimal("0.8500")
+                .compareTo(result.evidence().get(0).relevance()));
+        assertEquals(evidence.getId(), result.evidence().get(0).id());
     }
 
     @Test
@@ -313,6 +347,7 @@ class DiagnosisResultQueryServiceTests {
         verify(compatibilityIssueMapper, never()).selectList(any());
         verify(modificationSuggestionMapper, never()).selectList(any());
         verify(upgradePlanStepMapper, never()).selectList(any());
+        verify(knowledgeEvidenceMapper, never()).selectList(any());
     }
 
     @Test
@@ -340,6 +375,7 @@ class DiagnosisResultQueryServiceTests {
         when(modificationSuggestionMapper.selectList(any()))
                 .thenReturn(List.of());
         when(upgradePlanStepMapper.selectList(any())).thenReturn(List.of());
+        when(knowledgeEvidenceMapper.selectList(any())).thenReturn(List.of());
 
         BusinessException error = assertThrows(
                 BusinessException.class,

@@ -18,7 +18,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Component
 public class DiagnosisPromptBuilder {
@@ -80,14 +79,58 @@ public class DiagnosisPromptBuilder {
         ));
     }
 
+    /**
+     * 把检索到的文档渲染成带编号的引用块 [REF-i]，并附上来源标题与 URL，
+     * 使模型可以在 evidence 中按 refIndex 精确引用，而不是凭记忆编造来源。
+     */
     private String buildReferences(List<Document> references) {
-        return references.stream()
-                .map(reference -> """
-                        <reference>
-                        %s
-                        </reference>
-                        """.formatted(reference.getText()))
-                .collect(Collectors.joining("\n"));
+        StringBuilder builder = new StringBuilder();
+        for (int index = 0; index < references.size(); index++) {
+            Document reference = references.get(index);
+            builder.append("<reference id=\"REF-")
+                    .append(index)
+                    .append("\">\n");
+            String title = referenceTitle(reference);
+            if (!title.isEmpty()) {
+                builder.append("<title>")
+                        .append(title)
+                        .append("</title>\n");
+            }
+            String url = referenceUrl(reference);
+            if (!url.isEmpty()) {
+                builder.append("<source_url>")
+                        .append(url)
+                        .append("</source_url>\n");
+            }
+            builder.append("<content>\n")
+                    .append(reference.getText())
+                    .append("\n</content>\n")
+                    .append("</reference>\n");
+        }
+        return builder.toString();
+    }
+
+    /**
+     * 优先使用文档元数据中的 source_id，否则取正文第一行作为标题。
+     */
+    private String referenceTitle(Document reference) {
+        Object sourceId = reference.getMetadata().get("source_id");
+        if (sourceId != null && !sourceId.toString().isBlank()) {
+            return sourceId.toString();
+        }
+        String firstLine = reference.getText().lines()
+                .map(String::strip)
+                .filter(line -> !line.isEmpty())
+                .findFirst()
+                .orElse("Unnamed reference");
+        return firstLine.length() <= 120
+                ? firstLine
+                : firstLine.substring(0, 120) + "...";
+    }
+
+    private String referenceUrl(Document reference) {
+        Object url = reference.getMetadata().get("source_url");
+        return url == null ? "" : url.toString();
     }
 
     private PromptTemplate promptTemplate(Resource resource) {

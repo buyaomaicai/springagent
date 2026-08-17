@@ -62,6 +62,58 @@ class DiagnosisResultParserTests {
                 UpgradePhase.PREPARATION,
                 result.planSteps().get(0).phase()
         );
+        assertEquals(0, result.evidence().get(0).refIndex());
+        assertEquals(
+                "https://github.com/spring-projects/spring-boot/wiki/"
+                        + "Spring-Boot-3.0-Migration-Guide",
+                result.evidence().get(0).sourceUrl()
+        );
+    }
+
+    @Test
+    void parsesMultipleEvidenceReferences() {
+        String json = resultWithAllSections().replace(
+                "\"title\": \"Spring-Boot-3.0-Migration-Guide\"",
+                "\"title\": \"Spring-Boot-3.0-Migration-Guide\"},"
+                        + "{\"refIndex\": 2,"
+                        + "\"sourceUrl\": \"https://example.com/notes\","
+                        + "\"title\": \"Release Notes\""
+        );
+
+        DiagnosisResult result = parser.parse(json);
+
+        assertEquals(2, result.evidence().size());
+        assertEquals(2, result.evidence().get(1).refIndex());
+        assertEquals("Release Notes", result.evidence().get(1).title());
+    }
+
+    @Test
+    void rejectsNegativeEvidenceRefIndex() {
+        String json = resultWithAllSections()
+                .replace("\"refIndex\": 0", "\"refIndex\": -1");
+
+        DiagnosisResultParseException error = assertThrows(
+                DiagnosisResultParseException.class,
+                () -> parser.parse(json)
+        );
+
+        assertTrue(error.getMessage().contains("evidence[0].refIndex"));
+    }
+
+    @Test
+    void rejectsEvidenceWithoutSourceUrl() {
+        String json = resultWithAllSections().replace(
+                "\"sourceUrl\": \"https://github.com/spring-projects/"
+                        + "spring-boot/wiki/Spring-Boot-3.0-Migration-Guide\"",
+                "\"sourceUrl\": \"  \""
+        );
+
+        DiagnosisResultParseException error = assertThrows(
+                DiagnosisResultParseException.class,
+                () -> parser.parse(json)
+        );
+
+        assertTrue(error.getMessage().contains("evidence[0].sourceUrl"));
     }
 
     @Test
@@ -100,7 +152,8 @@ class DiagnosisResultParserTests {
                   "risks": [],
                   "compatibilityIssues": [],
                   "suggestions": [],
-                  "planSteps": []
+                  "planSteps": [],
+                  "evidence": []
                 }
                 """;
 
@@ -219,7 +272,8 @@ class DiagnosisResultParserTests {
                   "risks": [],
                   "compatibilityIssues": [],
                   "suggestions": [],
-                  "planSteps": []
+                  "planSteps": [],
+                  "evidence": []
                 }
                 """;
     }
@@ -266,6 +320,11 @@ class DiagnosisResultParserTests {
                     "verification": "Run mvn test",
                     "rollbackAction": "Restore pom.xml",
                     "estimatedEffort": "30 minutes"
+                  }],
+                  "evidence": [{
+                    "refIndex": 0,
+                    "sourceUrl": "https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-3.0-Migration-Guide",
+                    "title": "Spring-Boot-3.0-Migration-Guide"
                   }]
                 }
                 """;

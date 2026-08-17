@@ -13,6 +13,7 @@ import com.springagent.diagnosis.model.ProjectDependency;
 import com.springagent.diagnosis.model.ProjectInput;
 import com.springagent.diagnosis.model.VersionSource;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -69,7 +70,14 @@ class DiagnosisPromptBuilderTests {
                         SenderRole.USER,
                         "这是上一轮问题"
                 )),
-                List.of(new Document("Spring Boot 3.4 migration guide")),
+                List.of(new Document(
+                        "Spring Boot 3.4 migration guide",
+                        Map.of(
+                                "source_id", "spring-boot-3.4-guide",
+                                "source_url",
+                                "https://example.com/guide"
+                        )
+                )),
                 Optional.of(projectInput)
         );
 
@@ -91,7 +99,9 @@ class DiagnosisPromptBuilderTests {
         assertTrue(text.contains("spring-boot-starter-web"));
         assertTrue(text.contains("SPRING_BOOT_BOM"));
         assertTrue(text.contains("如何升级到 Spring Boot 3.4？"));
-        assertTrue(text.contains("<reference>"));
+        assertTrue(text.contains("<reference id=\"REF-0\">"));
+        assertTrue(text.contains("<title>spring-boot-3.4-guide</title>"));
+        assertTrue(text.contains("<source_url>https://example.com/guide</source_url>"));
         assertTrue(text.contains("Spring Boot 3.4 migration guide"));
         assertFalse(text.contains("\"status\": \"NOT_PROVIDED\""));
         assertFalse(text.contains("$projectContext$"));
@@ -105,6 +115,7 @@ class DiagnosisPromptBuilderTests {
                 systemText
         );
         assertTrue(systemText.contains("\"compatibilityIssues\""));
+        assertTrue(systemText.contains("\"evidence\""));
         assertTrue(systemText.contains("LOW | MEDIUM | HIGH | CRITICAL"));
         assertTrue(systemText.contains(
                 "PREPARATION | BUILD | SOURCE_CODE | DATA | TESTING"

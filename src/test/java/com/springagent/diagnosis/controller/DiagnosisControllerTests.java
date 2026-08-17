@@ -242,6 +242,7 @@ class DiagnosisControllerTests {
                 List.of(),
                 List.of(),
                 List.of(),
+                List.of(),
                 List.of()
         );
         when(diagnosisResultQueryService.getResult(DIAGNOSIS_ID))
@@ -264,7 +265,8 @@ class DiagnosisControllerTests {
                 .andExpect(jsonPath("$.data.target.springBootVersion")
                         .value("3.2.0"))
                 .andExpect(jsonPath("$.data.risks").isArray())
-                .andExpect(jsonPath("$.data.planSteps").isArray());
+                .andExpect(jsonPath("$.data.planSteps").isArray())
+                .andExpect(jsonPath("$.data.evidence").isArray());
     }
 
     @Test

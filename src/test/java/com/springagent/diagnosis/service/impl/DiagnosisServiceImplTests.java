@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.doThrow;
@@ -47,6 +48,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,6 +61,7 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.deepseek.DeepSeekChatModel;
+import org.springframework.ai.document.Document;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 
@@ -209,8 +212,10 @@ class DiagnosisServiceImplTests {
                 response("first"),
                 response(" second")
         ));
-        when(diagnosisResultStructuringService.structure("first second"))
-                .thenReturn(result);
+        when(diagnosisResultStructuringService.structure(
+                eq("first second"),
+                anyList()
+        )).thenReturn(result);
 
         DiagnosisStream stream = diagnosisService.callDiagnosis(request());
 
@@ -235,7 +240,7 @@ class DiagnosisServiceImplTests {
         verify(diagnosisRunLifecycleService)
                 .markRunning(prepared.run());
         verify(diagnosisResultStructuringService)
-                .structure("first second");
+                .structure(eq("first second"), anyList());
         verify(diagnosisResultPersistenceService).save(
                 eq(prepared.run()),
                 eq(result),
@@ -245,14 +250,40 @@ class DiagnosisServiceImplTests {
     }
 
     @Test
+    void passesRetrievedDocumentsToStructuringService() {
+        Document doc = new Document(
+                "Spring Boot 3.0 migration guide content",
+                Map.of("source_url", "https://example.com/guide")
+        );
+        when(knowledgeRetrievalService.searchSpringBoot30(any()))
+                .thenReturn(List.of(doc));
+        when(chatModel.stream(prompt)).thenReturn(
+                Flux.just(response("output"))
+        );
+        when(diagnosisResultStructuringService.structure(
+                eq("output"),
+                eq(List.of(doc))
+        )).thenReturn(diagnosisResult());
+
+        DiagnosisStream stream = diagnosisService.callDiagnosis(request());
+
+        stream.content().collectList().block(Duration.ofSeconds(1));
+
+        verify(diagnosisResultStructuringService)
+                .structure(eq("output"), eq(List.of(doc)));
+    }
+
+    @Test
     void marksRunFailedWhenStructuredResultCannotBeParsed() {
         DiagnosisResultParseException parseError =
                 new DiagnosisResultParseException("模型输出不是合法 JSON");
         when(chatModel.stream(prompt)).thenReturn(
                 Flux.just(response("invalid json"))
         );
-        when(diagnosisResultStructuringService.structure("invalid json"))
-                .thenThrow(parseError);
+        when(diagnosisResultStructuringService.structure(
+                eq("invalid json"),
+                anyList()
+        )).thenThrow(parseError);
 
         DiagnosisStream stream = diagnosisService.callDiagnosis(request());
 
@@ -288,8 +319,10 @@ class DiagnosisServiceImplTests {
         when(chatModel.stream(prompt)).thenReturn(
                 Flux.just(response("valid json"))
         );
-        when(diagnosisResultStructuringService.structure("valid json"))
-                .thenReturn(diagnosisResult());
+        when(diagnosisResultStructuringService.structure(
+                eq("valid json"),
+                anyList()
+        )).thenReturn(diagnosisResult());
         doThrow(new IllegalStateException("database unavailable"))
                 .when(diagnosisResultPersistenceService)
                 .save(
@@ -452,6 +485,7 @@ class DiagnosisServiceImplTests {
         return new DiagnosisResult(
                 "Upgrade is feasible",
                 new UpgradeTarget("17", "3.2.0"),
+                List.of(),
                 List.of(),
                 List.of(),
                 List.of(),

@@ -13,7 +13,8 @@ public record DiagnosisResult(
         @NotNull List<@Valid RiskItem> risks,
         @NotNull List<@Valid CompatibilityFinding> compatibilityIssues,
         @NotNull List<@Valid SuggestedModification> suggestions,
-        @NotNull List<@Valid UpgradePlanStepResult> planSteps
+        @NotNull List<@Valid UpgradePlanStepResult> planSteps,
+        @NotNull List<@Valid EvidenceReference> evidence
 ) {
     public DiagnosisResult {
         risks = risks == null ? null : List.copyOf(risks);
@@ -21,5 +22,6 @@ public record DiagnosisResult(
                 ? null : List.copyOf(compatibilityIssues);
         suggestions = suggestions == null ? null : List.copyOf(suggestions);
         planSteps = planSteps == null ? null : List.copyOf(planSteps);
+        evidence = evidence == null ? null : List.copyOf(evidence);
     }
 }

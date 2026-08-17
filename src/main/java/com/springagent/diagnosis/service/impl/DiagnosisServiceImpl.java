@@ -87,7 +87,11 @@ public class DiagnosisServiceImpl implements IDiagnosisService {
     private final ObjectMapper objectMapper;
     private final IDiagnosisRunService diagnosisRunService;
 
-    private record PreparedDiagnosis(Prompt prompt, DiagnosisRun diagnosisRun) {
+    private record PreparedDiagnosis(
+            Prompt prompt,
+            DiagnosisRun diagnosisRun,
+            List<Document> documents
+    ) {
     }
 
     /**
@@ -229,7 +233,7 @@ public class DiagnosisServiceImpl implements IDiagnosisService {
                     Optional.ofNullable(projectInput)
             );
             Prompt prompt = diagnosisPromptBuilder.build(promptContext);
-            return new PreparedDiagnosis(prompt, diagnosisRun);
+            return new PreparedDiagnosis(prompt, diagnosisRun, documents);
         } catch (RuntimeException error) {
             persistPreparationFailure(diagnosisRun, error);
             throw error;
@@ -279,7 +283,8 @@ public class DiagnosisServiceImpl implements IDiagnosisService {
 
                         DiagnosisResult result =
                                 diagnosisResultStructuringService.structure(
-                                        modelOutput
+                                        modelOutput,
+                                        prepared.documents()
                                 );
 
                         persistSuccessfulRun(

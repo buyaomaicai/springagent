@@ -5,17 +5,20 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.springagent.diagnosis.domain.dto.result.CompatibilityFinding;
 import com.springagent.diagnosis.domain.dto.result.DiagnosisResult;
+import com.springagent.diagnosis.domain.dto.result.EvidenceReference;
 import com.springagent.diagnosis.domain.dto.result.RiskItem;
 import com.springagent.diagnosis.domain.dto.result.SuggestedModification;
 import com.springagent.diagnosis.domain.dto.result.UpgradePlanStepResult;
 import com.springagent.diagnosis.entity.CompatibilityIssue;
 import com.springagent.diagnosis.entity.DiagnosisRisk;
 import com.springagent.diagnosis.entity.DiagnosisRun;
+import com.springagent.diagnosis.entity.KnowledgeEvidence;
 import com.springagent.diagnosis.entity.ModificationSuggestion;
 import com.springagent.diagnosis.entity.UpgradePlanStep;
 import com.springagent.diagnosis.mapper.CompatibilityIssueMapper;
 import com.springagent.diagnosis.mapper.DiagnosisRiskMapper;
 import com.springagent.diagnosis.mapper.DiagnosisRunMapper;
+import com.springagent.diagnosis.mapper.KnowledgeEvidenceMapper;
 import com.springagent.diagnosis.mapper.ModificationSuggestionMapper;
 import com.springagent.diagnosis.mapper.UpgradePlanStepMapper;
 import com.springagent.diagnosis.model.DiagnosisRunStatus;
@@ -45,6 +48,7 @@ public class DiagnosisResultPersistenceService
     private final CompatibilityIssueMapper compatibilityIssueMapper;
     private final ModificationSuggestionMapper modificationSuggestionMapper;
     private final UpgradePlanStepMapper upgradePlanStepMapper;
+    private final KnowledgeEvidenceMapper knowledgeEvidenceMapper;
     private final DiagnosisRunLifecycleService diagnosisRunLifecycleService;
     private final ObjectMapper objectMapper;
 
@@ -61,6 +65,7 @@ public class DiagnosisResultPersistenceService
         saveCompatibilityIssues(diagnosisRun, result);
         saveSuggestions(diagnosisRun, result);
         savePlanSteps(diagnosisRun, result);
+        saveEvidence(diagnosisRun, result);
 
         // markSucceeded 使用默认 REQUIRED 传播级别，因此会加入当前事务。
         diagnosisRunLifecycleService.markSucceeded(
@@ -194,6 +199,34 @@ public class DiagnosisResultPersistenceService
                     "保存升级计划步骤失败"
             );
         }
+    }
+
+    private void saveEvidence(
+            DiagnosisRun diagnosisRun,
+            DiagnosisResult result
+    ) {
+        for (EvidenceReference source : result.evidence()) {
+            KnowledgeEvidence entity = new KnowledgeEvidence()
+                    .setDiagnosisId(diagnosisRun.getId())
+                    .setSourceType(blankToNull(source.sourceType(), "OTHER"))
+                    .setSourceUrl(source.sourceUrl())
+                    .setTitle(source.title())
+                    .setComponent(blankToNull(source.component(), null))
+                    .setVersionRange(blankToNull(source.versionRange(), null))
+                    .setExcerpt(source.excerpt())
+                    .setRelevance(source.relevance());
+            requireOneRow(
+                    knowledgeEvidenceMapper.insert(entity),
+                    "保存知识证据失败"
+            );
+        }
+    }
+
+    private String blankToNull(String value, String fallback) {
+        if (value == null || value.isBlank()) {
+            return fallback;
+        }
+        return value;
     }
 
     private void requireOneRow(int affectedRows, String message) {

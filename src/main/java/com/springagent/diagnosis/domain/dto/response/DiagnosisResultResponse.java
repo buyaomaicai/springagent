@@ -13,12 +13,14 @@ public record DiagnosisResultResponse(
         List<DiagnosisRiskResponse> risks,
         List<CompatibilityIssueResponse> compatibilityIssues,
         List<ModificationSuggestionResponse> suggestions,
-        List<UpgradePlanStepResponse> planSteps
+        List<UpgradePlanStepResponse> planSteps,
+        List<KnowledgeEvidenceResponse> evidence
 ) {
     public DiagnosisResultResponse {
         risks = List.copyOf(risks);
         compatibilityIssues = List.copyOf(compatibilityIssues);
         suggestions = List.copyOf(suggestions);
         planSteps = List.copyOf(planSteps);
+        evidence = List.copyOf(evidence);
     }
 }

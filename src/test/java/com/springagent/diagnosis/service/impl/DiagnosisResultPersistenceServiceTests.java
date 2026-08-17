@@ -20,6 +20,7 @@ import com.springagent.diagnosis.domain.constant.SuggestionPriority;
 import com.springagent.diagnosis.domain.constant.UpgradePhase;
 import com.springagent.diagnosis.domain.dto.result.CompatibilityFinding;
 import com.springagent.diagnosis.domain.dto.result.DiagnosisResult;
+import com.springagent.diagnosis.domain.dto.result.EvidenceReference;
 import com.springagent.diagnosis.domain.dto.result.RiskItem;
 import com.springagent.diagnosis.domain.dto.result.SuggestedModification;
 import com.springagent.diagnosis.domain.dto.result.UpgradePlanStepResult;
@@ -27,13 +28,16 @@ import com.springagent.diagnosis.domain.dto.result.UpgradeTarget;
 import com.springagent.diagnosis.entity.CompatibilityIssue;
 import com.springagent.diagnosis.entity.DiagnosisRisk;
 import com.springagent.diagnosis.entity.DiagnosisRun;
+import com.springagent.diagnosis.entity.KnowledgeEvidence;
 import com.springagent.diagnosis.entity.ModificationSuggestion;
 import com.springagent.diagnosis.entity.UpgradePlanStep;
 import com.springagent.diagnosis.mapper.CompatibilityIssueMapper;
 import com.springagent.diagnosis.mapper.DiagnosisRiskMapper;
 import com.springagent.diagnosis.mapper.DiagnosisRunMapper;
+import com.springagent.diagnosis.mapper.KnowledgeEvidenceMapper;
 import com.springagent.diagnosis.mapper.ModificationSuggestionMapper;
 import com.springagent.diagnosis.mapper.UpgradePlanStepMapper;
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -83,6 +87,9 @@ class DiagnosisResultPersistenceServiceTests {
     private UpgradePlanStepMapper upgradePlanStepMapper;
 
     @Mock
+    private KnowledgeEvidenceMapper knowledgeEvidenceMapper;
+
+    @Mock
     private DiagnosisRunLifecycleService diagnosisRunLifecycleService;
 
     private DiagnosisResultPersistenceService persistenceService;
@@ -95,6 +102,7 @@ class DiagnosisResultPersistenceServiceTests {
                 compatibilityIssueMapper,
                 modificationSuggestionMapper,
                 upgradePlanStepMapper,
+                knowledgeEvidenceMapper,
                 diagnosisRunLifecycleService,
                 new ObjectMapper()
         );
@@ -115,6 +123,8 @@ class DiagnosisResultPersistenceServiceTests {
                 any(ModificationSuggestion.class)
         )).thenReturn(1);
         when(upgradePlanStepMapper.insert(any(UpgradePlanStep.class)))
+                .thenReturn(1);
+        when(knowledgeEvidenceMapper.insert(any(KnowledgeEvidence.class)))
                 .thenReturn(1);
 
         persistenceService.save(
@@ -174,6 +184,22 @@ class DiagnosisResultPersistenceServiceTests {
         assertEquals("PENDING", step.getStatus());
         assertEquals("upgrade parent", step.getPrerequisites().get(0).asText());
 
+        ArgumentCaptor<KnowledgeEvidence> evidenceCaptor =
+                ArgumentCaptor.forClass(KnowledgeEvidence.class);
+        verify(knowledgeEvidenceMapper).insert(evidenceCaptor.capture());
+        KnowledgeEvidence evidence = evidenceCaptor.getValue();
+        assertEquals(run.getId(), evidence.getDiagnosisId());
+        assertEquals("MIGRATION_GUIDE", evidence.getSourceType());
+        assertEquals(
+                "https://github.com/spring-projects/spring-boot/wiki/"
+                        + "Spring-Boot-3.0-Migration-Guide",
+                evidence.getSourceUrl()
+        );
+        assertEquals("spring-boot", evidence.getComponent());
+        assertEquals("3.0", evidence.getVersionRange());
+        assertEquals(0, new BigDecimal("0.8500")
+                .compareTo(evidence.getRelevance()));
+
         verify(diagnosisRunLifecycleService).markSucceeded(
                 run,
                 "raw model output",
@@ -187,6 +213,7 @@ class DiagnosisResultPersistenceServiceTests {
         DiagnosisResult result = new DiagnosisResult(
                 "No blocking issue",
                 new UpgradeTarget("17", "3.2.0"),
+                List.of(),
                 List.of(),
                 List.of(),
                 List.of(),
@@ -206,6 +233,8 @@ class DiagnosisResultPersistenceServiceTests {
                 .insert(any(ModificationSuggestion.class));
         verify(upgradePlanStepMapper, never())
                 .insert(any(UpgradePlanStep.class));
+        verify(knowledgeEvidenceMapper, never())
+                .insert(any(KnowledgeEvidence.class));
         verify(diagnosisRunLifecycleService).markSucceeded(
                 run,
                 "{}",
@@ -293,6 +322,17 @@ class DiagnosisResultPersistenceServiceTests {
                         "Run mvn verify",
                         "Restore the old parent",
                         "1 hour"
+                )),
+                List.of(new EvidenceReference(
+                        0,
+                        "https://github.com/spring-projects/spring-boot/wiki/"
+                                + "Spring-Boot-3.0-Migration-Guide",
+                        "Spring-Boot-3.0-Migration-Guide",
+                        "MIGRATION_GUIDE",
+                        "spring-boot",
+                        "3.0",
+                        new BigDecimal("0.8500"),
+                        "Spring Boot 3.0 requires Java 17"
                 ))
         );
     }

@@ -6,6 +6,7 @@ Spring Agent 是一个面向 Java 与 Spring 项目升级场景的智能诊断�
 
 - **流式升级诊断**：通过 DeepSeek 模型生成诊断结果，并使用 SSE 实时返回内容。
 - **RAG 知识增强**：使用 Ollama `bge-m3` 生成向量，通过 PostgreSQL + pgvector 检索 Spring 官方迁移资料。
+- **证据引用闭环**：检索到的官方文档以编号引用（`[REF-i]`）注入提示词，模型声明实际使用的引用；URL、标题、置信度、摘录等事实字段一律取自服务端检索结果，杜绝模型编造来源，并随诊断结果持久化、可查询。
 - **多轮会话**：保存用户问题、模型回复和消息状态，支持按会话继续追问。
 - **统一响应协议**：普通接口使用统一 JSON 响应体，流式接口依次发送 `meta`、`chunk`、`done` 或 `error` 事件。
 - **诊断数据模型**：已提供风险、兼容性问题、修改建议、知识证据和升级步骤等持久化结构。
@@ -134,6 +135,10 @@ curl.exe -N http://localhost:8080/diagnosis/stream `
 | --- | --- | --- |
 | `GET` | `/diagnosis/health` | 检查诊断服务状态 |
 | `POST` | `/diagnosis/stream` | 发起流式升级诊断 |
+| `POST` | `/diagnosis/prepare` | 上传 `pom.xml` 并基于解析结果发起流式诊断 |
+| `GET` | `/diagnosis/runs` | 分页查询诊断运行历史，支持按会话与状态过滤 |
+| `GET` | `/diagnosis/runs/{diagnosisId}` | 查询单次诊断的运行详情与完整回复 |
+| `GET` | `/diagnosis/runs/{diagnosisId}/result` | 查询结构化诊断结果（风险、兼容性问题、修改建议、升级步骤与证据引用） |
 | `POST` | `/project-artifacts/pom` | 上传并解析 Maven `pom.xml` |
 | `GET` | `/admin/message` | 查询用户及其会话列表 |
 | `GET` | `/admin/message/detail/{id}` | 查询指定用户的会话与消息 |

@@ -16,17 +16,20 @@ import com.springagent.diagnosis.domain.dto.response.CompatibilityIssueResponse;
 import com.springagent.diagnosis.domain.dto.response.DiagnosisResultResponse;
 import com.springagent.diagnosis.domain.dto.response.DiagnosisRiskResponse;
 import com.springagent.diagnosis.domain.dto.response.DiagnosisRunSummaryResponse;
+import com.springagent.diagnosis.domain.dto.response.KnowledgeEvidenceResponse;
 import com.springagent.diagnosis.domain.dto.response.ModificationSuggestionResponse;
 import com.springagent.diagnosis.domain.dto.response.UpgradePlanStepResponse;
 import com.springagent.diagnosis.domain.dto.response.UpgradeTargetResponse;
 import com.springagent.diagnosis.entity.CompatibilityIssue;
 import com.springagent.diagnosis.entity.DiagnosisRisk;
 import com.springagent.diagnosis.entity.DiagnosisRun;
+import com.springagent.diagnosis.entity.KnowledgeEvidence;
 import com.springagent.diagnosis.entity.ModificationSuggestion;
 import com.springagent.diagnosis.entity.UpgradePlanStep;
 import com.springagent.diagnosis.mapper.CompatibilityIssueMapper;
 import com.springagent.diagnosis.mapper.DiagnosisRiskMapper;
 import com.springagent.diagnosis.mapper.DiagnosisRunMapper;
+import com.springagent.diagnosis.mapper.KnowledgeEvidenceMapper;
 import com.springagent.diagnosis.mapper.ModificationSuggestionMapper;
 import com.springagent.diagnosis.mapper.UpgradePlanStepMapper;
 import com.springagent.diagnosis.model.DiagnosisRunStatus;
@@ -58,6 +61,7 @@ public class DiagnosisResultQueryService
     private final CompatibilityIssueMapper compatibilityIssueMapper;
     private final ModificationSuggestionMapper modificationSuggestionMapper;
     private final UpgradePlanStepMapper upgradePlanStepMapper;
+    private final KnowledgeEvidenceMapper knowledgeEvidenceMapper;
     private final ObjectMapper objectMapper;
 
     /**
@@ -148,6 +152,11 @@ public class DiagnosisResultQueryService
                         .eq(UpgradePlanStep::getDiagnosisId, diagnosisId)
                         .orderByAsc(UpgradePlanStep::getSequenceNo)
         );
+        List<KnowledgeEvidence> evidence = knowledgeEvidenceMapper.selectList(
+                Wrappers.lambdaQuery(KnowledgeEvidence.class)
+                        .eq(KnowledgeEvidence::getDiagnosisId, diagnosisId)
+                        .orderByDesc(KnowledgeEvidence::getRelevance)
+        );
 
         try {
             return new DiagnosisResultResponse(
@@ -159,7 +168,8 @@ public class DiagnosisResultQueryService
                             .map(this::mapCompatibilityIssue)
                             .toList(),
                     suggestions.stream().map(this::mapSuggestion).toList(),
-                    planSteps.stream().map(this::mapPlanStep).toList()
+                    planSteps.stream().map(this::mapPlanStep).toList(),
+                    evidence.stream().map(this::mapEvidence).toList()
             );
         } catch (RuntimeException error) {
             log.error(
@@ -362,6 +372,19 @@ public class DiagnosisResultQueryService
                 source.getRollbackAction(),
                 source.getEstimatedEffort(),
                 source.getStatus()
+        );
+    }
+
+    private KnowledgeEvidenceResponse mapEvidence(KnowledgeEvidence source) {
+        return new KnowledgeEvidenceResponse(
+                source.getId(),
+                source.getSourceType(),
+                source.getSourceUrl(),
+                source.getTitle(),
+                source.getComponent(),
+                source.getVersionRange(),
+                source.getExcerpt(),
+                source.getRelevance()
         );
     }
 }
