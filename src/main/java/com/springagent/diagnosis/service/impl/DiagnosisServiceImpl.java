@@ -29,6 +29,8 @@ import com.springagent.diagnosis.service.IDiagnosisResultStructuringService;
 import com.springagent.diagnosis.service.IDiagnosisRunService;
 import com.springagent.diagnosis.service.IDiagnosisService;
 import com.springagent.diagnosis.tool.DiagnosisPromptBuilder;
+import com.springagent.knowledge.retrieval.RetrievedEvidence;
+import com.springagent.knowledge.retrieval.RetrievalRequest;
 import com.springagent.knowledge.service.KnowledgeRetrievalService;
 import com.springagent.parser.ArtifactType;
 import com.springagent.parser.ProjectArtifactParser;
@@ -36,6 +38,7 @@ import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -64,6 +67,8 @@ public class DiagnosisServiceImpl implements IDiagnosisService {
 
     private static final String MODEL_PROVIDER = "DeepSeek";
     private static final String PROMPT_VERSION = "diagnosis-v2";
+    private static final int RETRIEVAL_TOP_K = 5;
+    private static final double RETRIEVAL_MIN_SCORE = 0.0;
     private static final String PREPARATION_ERROR_CODE =
             "DIAGNOSIS_PREPARATION_FAILED";
     private static final String STREAM_ERROR_CODE = "MODEL_STREAM_FAILED";
@@ -224,8 +229,19 @@ public class DiagnosisServiceImpl implements IDiagnosisService {
         );
 
         try {
+            // 混合检索（向量 + 关键词 + RRF）：基于完整知识库检索，
+            // 不再限定单一文档来源
             List<Document> documents = knowledgeRetrievalService
-                    .searchSpringBoot30(input);
+                    .search(new RetrievalRequest(
+                            input,
+                            RETRIEVAL_TOP_K,
+                            RETRIEVAL_MIN_SCORE,
+                            Map.of()
+                    ))
+                    .evidences()
+                    .stream()
+                    .map(RetrievedEvidence::document)
+                    .toList();
             DiagnosisPromptContext promptContext = new DiagnosisPromptContext(
                     input,
                     messageHistory,

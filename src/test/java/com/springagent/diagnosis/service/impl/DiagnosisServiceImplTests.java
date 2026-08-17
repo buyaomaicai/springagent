@@ -41,6 +41,9 @@ import com.springagent.diagnosis.service.IDiagnosisResultPersistenceService;
 import com.springagent.diagnosis.service.IDiagnosisRunService;
 import com.springagent.diagnosis.service.IDiagnosisResultStructuringService;
 import com.springagent.diagnosis.tool.DiagnosisPromptBuilder;
+import com.springagent.knowledge.retrieval.RetrievedEvidence;
+import com.springagent.knowledge.retrieval.RetrievalChannel;
+import com.springagent.knowledge.retrieval.SearchResult;
 import com.springagent.knowledge.service.KnowledgeRetrievalService;
 import com.springagent.parser.ProjectArtifactParser;
 import java.io.InputStream;
@@ -128,8 +131,8 @@ class DiagnosisServiceImplTests {
                 .thenReturn(new ChatConversation().setId(CONVERSATION_ID));
         lenient().when(chatMessageService.gethistory(CONVERSATION_ID))
                 .thenReturn(List.of());
-        lenient().when(knowledgeRetrievalService.searchSpringBoot30(any()))
-                .thenReturn(List.of());
+        lenient().when(knowledgeRetrievalService.search(any()))
+                .thenReturn(new SearchResult(List.of(), false));
         lenient().when(diagnosisPromptBuilder.build(
                         any(DiagnosisPromptContext.class)
                 ))
@@ -255,8 +258,12 @@ class DiagnosisServiceImplTests {
                 "Spring Boot 3.0 migration guide content",
                 Map.of("source_url", "https://example.com/guide")
         );
-        when(knowledgeRetrievalService.searchSpringBoot30(any()))
-                .thenReturn(List.of(doc));
+        when(knowledgeRetrievalService.search(any()))
+                .thenReturn(new SearchResult(
+                        List.of(new RetrievedEvidence(doc, 0.9,
+                                RetrievalChannel.HYBRID)),
+                        true
+                ));
         when(chatModel.stream(prompt)).thenReturn(
                 Flux.just(response("output"))
         );
@@ -383,7 +390,7 @@ class DiagnosisServiceImplTests {
         IllegalStateException retrievalError = new IllegalStateException(
                 "vector store unavailable"
         );
-        when(knowledgeRetrievalService.searchSpringBoot30(any()))
+        when(knowledgeRetrievalService.search(any()))
                 .thenThrow(retrievalError);
 
         IllegalStateException actualError = assertThrows(
