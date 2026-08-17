@@ -1,5 +1,12 @@
 # Repository Guidelines
 
+## Project Purpose & Working Mode
+
+The primary purpose of this project is **learning Agent development** — mastering the design and implementation of Agent systems is the goal, and the application code is the practice ground. When working with an AI assistant:
+
+- **Explain before/while implementing**: every change must come with a clear explanation of *what* was changed and *why* it was designed that way (trade-offs, alternatives considered, conventions followed). Never implement silently.
+- **Teach the design**: call out the architecture decisions — why a service boundary exists, why a transaction is placed where it is, why a table/field is shaped that way, how the pieces connect into the Agent pipeline.
+
 ## Project Structure & Module Organization
 
 This is a single-module Java 17 Spring Boot application. Production code lives under `src/main/java/com/springagent`, organized by feature: `ai` contains agent and prompt strategy code, `diagnosis` owns the REST and persistence workflow, `knowledge` integrates documentation sources, `parser` handles project inputs, and `report` builds upgrade plans. Shared configuration, exceptions, and persistence helpers belong in `common`. Runtime configuration, MyBatis XML mappers, and StringTemplate prompts are in `src/main/resources`. Tests mirror the production package tree under `src/test/java`. PostgreSQL setup is kept in `deploy/`; generated Maven output in `target/` must remain untracked.

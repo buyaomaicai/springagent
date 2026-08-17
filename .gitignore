@@ -42,3 +42,6 @@ build/
 .env
 deploy/.env
 src/main/resources/local.env
+
+### Competition materials (local only) ###
+docs/competition/
