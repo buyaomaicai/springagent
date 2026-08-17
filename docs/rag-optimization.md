@@ -156,6 +156,84 @@ KnowledgeIngestionService      # 重构：ingestAll() 遍历 registry，按扩�
 - 入库幂等（集成测试，需 PostgreSQL+Ollama）
 - 检索命中（集成测试：问 JDK 17 迁移问题 → 命中 jdk-17-migration 文档）
 
+### 接口签名（代码级，P0 实现蓝本）
+
+```java
+// ---------- 1. 来源注册表：数据从哪来 ----------
+public record SourceDocument(
+        String fileName,        // raw 下的文件名
+        String sourceType,      // MIGRATION_GUIDE | RELEASE_NOTES | JDK_DOC | SPRING_DOC
+        String targetVersion,   // "17" | "3.0"（null 表示不限定）
+        String sourceUrl        // 原始出处（evidence 闭环复用）
+) {}
+
+public record SourceDefinition(
+        String id,              // "jdk-17-migration"（幂等删除键）
+        String component,       // "jdk" | "spring-boot"（显式声明，不靠文件名猜）
+        String language,        // "en" | "zh"
+        Path rootPath,          // knowledge-base/raw/<id>
+        List<SourceDocument> documents
+) {}
+
+public interface SourceRegistry {
+    List<SourceDefinition> load();   // 解析 sources.yml
+}
+
+// ---------- 2. 解析器：识别结构（缺陷 2 修正） ----------
+public record Section(String title, int level, String text) {}
+
+public record ParsedDocument(
+        String sourceId,
+        String title,
+        List<Section> sections,          // 章节结构，供 P1 标题感知分块
+        Map<String, String> metadata     // 注册表显式元数据 + 结构补充
+) {}
+
+public enum KnowledgeFileFormat { ASCIIDOC, MARKDOWN, HTML }
+
+public interface DocumentParser {
+    KnowledgeFileFormat supportedFormat();
+    ParsedDocument parse(Path file, SourceDocument definition);
+}
+
+// ---------- 3. 入库编排：幂等 ----------
+@Service
+public class KnowledgeIngestionService {
+    public int ingestAll() {            // 遍历 registry → 路由 parser → 幂等入库
+        // for each source/doc: vectorStore.delete(filter source_id) → add(chunks)
+    }
+}
+```
+
+### sources.yml 扩展（显式元数据，缺陷 1 修正）
+
+```yaml
+git_sources:
+  - id: spring-boot-wiki
+    component: spring-boot
+    language: en
+    documents:
+      - path: releasenotes/Spring-Boot-3.0-Migration-Guide.asciidoc
+        source_type: MIGRATION_GUIDE
+        target_version: "3.0"
+        source_url: https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-3.0-Migration-Guide
+web_sources:
+  - id: jdk-17-migration
+    component: jdk
+    language: en
+    target_version: "17"
+    source_type: JDK_DOC
+    root_url: https://docs.oracle.com/en/java/javase/17/migrate/
+```
+
+### 测试清单（方法名 = 可观察行为）
+- `AsciidocDocumentParserTests`：`splitsSectionsByHeadingLevels` / `keepsTableAsMarkdownTable`
+- `HtmlDocumentParserTests`：`removesNavigationAndFooterNoise` / `convertsTableToMarkdownTable`
+- `MarkdownDocumentParserTests`：`extractsHeadingHierarchy`
+- `SourceRegistryTests`：`loadsExplicitMetadataFromSourcesYml`
+- `KnowledgeIngestionServiceTests`（集成）：`reingestingSameSourceDoesNotDuplicate`
+
+
 ### P2 混合检索：向量 + 关键词 + RRF（检索篇）
 - DDL：知识表加 `tsvector` 列 + 触发器自动维护 + GIN 索引
 - 双通道：pgvector 相似度 + `ts_rank` 关键词打分
